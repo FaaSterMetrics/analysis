@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
+import json
 import pathlib
+from collections import Counter
 
 from argmagic import argmagic
 
 import faastermetrics as fm
 
 
-def main(logdir: pathlib.Path):
+def list_logs(logdir: pathlib.Path):
     """
     Simple script for some initial testing on logging data.
 
@@ -14,12 +16,17 @@ def main(logdir: pathlib.Path):
         logdir: Directory containing logging data.
     """
 
-    files = {p.stem: fm.parse_logfile(p) for p in logdir.iterdir()}
+    log_entries = [
+        e
+        for p in logdir.iterdir()
+        for e in fm.parse_logfile(p)
+    ]
 
     print("= Available logs =")
-    for name, lines in files.items():
-        print(f"{name}: {len(lines)} entries")
+    platform_entries = Counter([e.platform for e in log_entries])
+    for name, entries in platform_entries.items():
+        print(f"{name}: {entries} entries")
 
 
 if __name__ == "__main__":
-    argmagic(main, positional=("logdir",))
+    argmagic(list_logs, positional=("logdir",))

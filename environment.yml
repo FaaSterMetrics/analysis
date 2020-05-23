@@ -68,4 +68,5 @@ dependencies:
   - zlib=1.2.11
   - pip:
     - argmagic
+    - json_coder
 
