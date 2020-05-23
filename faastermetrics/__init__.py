@@ -15,7 +15,7 @@ class LogEntry:
     data: dict
 
 
-def parse_logfile(path: pathlib.Path) -> List[dict]:
+def parse_logfile(path: pathlib.Path) -> List[LogEntry]:
     """Read json logs at the given path."""
     with open(path) as f:
         parsed_entries = [_parse_entry(line) for line in f]
