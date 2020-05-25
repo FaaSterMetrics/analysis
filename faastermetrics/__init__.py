@@ -21,6 +21,10 @@ class LogEntry:
     data: dict
     platform: str
 
+    @property
+    def event(self):
+        return self.data["event"]
+
 
 def parse_logfile(path: pathlib.Path, platform: str = None) -> List[LogEntry]:
     """Read json logs at the given path."""
@@ -52,4 +56,4 @@ def _parse_entry(raw_entry: str, platform: str) -> LogEntry:
 
 
 def _is_valid(entry: LogEntry) -> bool:
-    return entry is not None
+    return (entry is not None) and ("event" in entry.data) and ("fn" in entry.data["event"])
