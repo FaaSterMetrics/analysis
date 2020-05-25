@@ -16,6 +16,8 @@ def dump_logs(logdir: pathlib.Path, outdir: pathlib.Path):
         outdir: Destination for outputting collected log json.
     """
     log_entries = [e for p in logdir.iterdir() for e in fm.parse_logfile(p)]
+    if outdir.is_dir():
+        outdir = outdir / f"{logdir.name}.json"
     with open(outdir, "w") as jsfile:
         json.dump(log_entries, jsfile)
 
