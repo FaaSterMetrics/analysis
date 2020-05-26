@@ -2,6 +2,7 @@
 import json
 import pathlib
 from pprint import pprint
+from typing import List
 
 from collections import defaultdict
 
@@ -9,7 +10,7 @@ from argmagic import argmagic
 import faastermetrics as fm
 
 
-def print_function_tree(entries: "List[fm.LogEntry]"):
+def print_function_tree(entries: List[fm.LogEntry]):
     # group entries by function
     by_fn = defaultdict(list)
     for entry in entries:
