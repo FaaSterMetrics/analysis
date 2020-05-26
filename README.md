@@ -44,3 +44,18 @@ $ python setup.py develop
 
 A development version can also be uninstalled by using: `python setup.py develop
 --uninstall`.
+
+
+## Usage
+
+### Import log data from experiments
+
+Experiments generate log data that is unfiltered and separate for each platform.
+`./scripts/dump_logs.py` filters logs and outputs clean log data into a
+specified output directory.
+
+```
+$ ./scripts/dump_logs.py ../experiments/logs/webservice/2020-05-23_16-21-29 ./output/
+```
+
+This will output a single `2020-05-23_16-21-29.json` in the output directory.
