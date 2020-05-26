@@ -33,7 +33,7 @@ $ conda env list  # check that the env is properly installed and activated
 > faastermetrics        *  /Users/max/miniconda/envs/faastermetrics
 ```
 
-## Development install
+### Development install
 
 Install the faastermetrics from the current repository by executing setup.py in
 development mode:
