@@ -28,6 +28,15 @@ class LogEntry:
         return self.data["event"]
 
 
+def load_logs(logdump: pathlib.Path) -> List[LogEntry]:
+    """Load dumped logs in json format.
+
+    This is an alternative to just directly using json.load on a opened file.
+    """
+    with open(logdump, "r") as logfile:
+        entries = json.load(logdump)
+    return entries
+
 def is_log_folder(logdir: pathlib.Path) -> bool:
     """Check whether the given folder is a valid log directory, eg whether aws,
     gcp logs etc are contained."""
