@@ -1,13 +1,13 @@
 import json
 import pathlib
 import datetime
-from typing import List
+from typing import List, Union
 
 from dataclasses import dataclass
 
 from json_coder import register
 
-from .logentry import LogEntry, RequestLog, PerfLog
+from .logentry import LogEntry, RequestLog, PerfLog, cast_log_type
 from .contextgroup import ContextGroup, create_context_groups
 
 
@@ -19,13 +19,15 @@ register("datetime", datetime.datetime, datetime.datetime.fromisoformat, datetim
 MESSAGE_TAG = "FAASTERMETRICS"
 
 
-def load_logs(logdump: pathlib.Path) -> List[LogEntry]:
+def load_logs(logdump: pathlib.Path) -> List[Union[RequestLog, PerfLog]]:
     """Load dumped logs in json format.
 
     This is an alternative to just directly using json.load on a opened file.
     """
     with open(logdump, "r") as logfile:
         entries = json.load(logfile)
+
+    entries = [cast_log_type(e) for e in entries]
     return entries
 
 def is_log_folder(logdir: pathlib.Path) -> bool:

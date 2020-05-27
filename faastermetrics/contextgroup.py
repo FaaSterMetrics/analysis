@@ -17,10 +17,14 @@ class ContextGroup:
     def context_id(self):
         return self._context_id
 
+    def _has_request(self):
+        return any(isinstance(e, RequestLog) for e in self._entries)
+
     def add(self, entry: Union[RequestLog, PerfLog]) -> bool:
         """Add entries to the context group, return True/False based on whether
         the added entry was valid or not."""
-        if self.context_id is not None and entry.context_id is None:
+        # for now only allow a single request log
+        if self._has_request() and isinstance(entry, RequestLog):
             return False
 
         new_entries = self._entries + [entry]
