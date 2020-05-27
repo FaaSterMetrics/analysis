@@ -5,7 +5,10 @@ from typing import List
 
 from dataclasses import dataclass
 
-from json_coder import jsonify, register
+from json_coder import register
+
+from .logentry import LogEntry, RequestLog, PerfLog
+from .contextgroup import ContextGroup, create_context_groups
 
 
 __version__ = "0.5.1"
@@ -14,18 +17,6 @@ register("datetime", datetime.datetime, datetime.datetime.fromisoformat, datetim
 
 
 MESSAGE_TAG = "FAASTERMETRICS"
-
-
-@jsonify("logentry")
-@dataclass
-class LogEntry:
-    timestamp: datetime.datetime
-    data: dict
-    platform: str
-
-    @property
-    def event(self):
-        return self.data["event"]
 
 
 def load_logs(logdump: pathlib.Path) -> List[LogEntry]:
