@@ -34,7 +34,7 @@ def load_logs(logdump: pathlib.Path) -> List[LogEntry]:
     This is an alternative to just directly using json.load on a opened file.
     """
     with open(logdump, "r") as logfile:
-        entries = json.load(logdump)
+        entries = json.load(logfile)
     return entries
 
 def is_log_folder(logdir: pathlib.Path) -> bool:
