@@ -47,11 +47,12 @@ def plot_function_execution_time(data, plot_dir):
     ax.boxplot(function_durations.values(), labels=function_durations.keys())
     ax.set_ylabel("Execution Time (ms)")
     ax.set_title("Comparison of total execution time in current deployment.")
+    ax.set_yscale("log")
     fig.tight_layout()
     fig.savefig(str(plot_dir / "boxplot.png"))
 
 
-def main(input_data, plot_dir):
+def main(input_data: pathlib.Path, plot_dir: pathlib.Path):
     # setup input and output paths
     # input_data = pathlib.Path("output/2020-05-27_10-41-14.json")
     # plot_dir = pathlib.Path("output/plots") / input_data.stem
