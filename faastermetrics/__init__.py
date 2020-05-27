@@ -28,6 +28,23 @@ class LogEntry:
         return self.data["event"]
 
 
+def is_log_folder(logdir: pathlib.Path) -> bool:
+    """Check whether the given folder is a valid log directory, eg whether aws,
+    gcp logs etc are contained."""
+    num_logs = sum(1 for p in logdir.iterdir() if p.suffix == ".log")
+    return num_logs > 0
+
+
+def parse_logdir(path: pathlib.Path) -> List[LogEntry]:
+    if not is_log_folder(path):
+        raise ValueError(f"{path} is not a valid log directory.")
+    entries = [
+        entry
+        for filepath in path.iterdir() for entry in parse_logfile(filepath, platform=filepath.stem)
+    ]
+    return entries
+
+
 def parse_logfile(path: pathlib.Path, platform: str = None) -> List[LogEntry]:
     """Read json logs at the given path."""
     if platform is None:
