@@ -11,7 +11,7 @@ from .logentry import LogEntry, RequestLog, PerfLog, cast_log_type
 from .contextgroup import ContextGroup, create_context_groups
 
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 register("datetime", datetime.datetime, datetime.datetime.fromisoformat, datetime.datetime.isoformat)
 
