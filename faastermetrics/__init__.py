@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from json_coder import jsonify, register
 
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 register("datetime", datetime.datetime, datetime.datetime.fromisoformat, datetime.datetime.isoformat)
 
