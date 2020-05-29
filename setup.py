@@ -22,6 +22,10 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/faastermetrics/analysis",
     packages=setuptools.find_packages(),
+    install_requires=[
+        "json_coder==0.5",
+        "argmagic==1.0.0",
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
