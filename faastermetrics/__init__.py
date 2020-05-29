@@ -77,4 +77,4 @@ def _parse_entry(raw_entry: str, platform: str) -> LogEntry:
 
 
 def _is_valid(entry: LogEntry) -> bool:
-    return (entry is not None) and ("event" in entry.data) and ("fn" in entry.data["event"])
+    return entry is not None and entry.data["version"] is not None
