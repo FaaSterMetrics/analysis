@@ -4,7 +4,7 @@ import pathlib
 from pprint import pprint
 from typing import List
 
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 from argmagic import argmagic
 import faastermetrics as fm
@@ -16,10 +16,11 @@ def print_function_tree(entries: List[fm.LogEntry]):
     for entry in entries:
         if "event" not in entry.data:
             continue
-        by_fn[entry.event["fn"]].append(entry)
+        by_fn[entry.fn["name"]].append(entry)
 
     for name, fn_entries in by_fn.items():
-        print(f"{name}: {len(fn_entries)} entries")
+        subtypes = Counter([type(e) for e in fn_entries])
+        print(f"{name}: {len(fn_entries)} entries : {subtypes}")
         if name == "undefined":
             continue
         # for entry in fn_entries:
@@ -33,8 +34,7 @@ def main(logdump: pathlib.Path):
         logdump: Path to log json dump.
     """
 
-    with open(logdump, "r") as jsfile:
-        data = json.load(jsfile)
+    data = fm.load_logs(logdump)
 
     print_function_tree(data)
 
