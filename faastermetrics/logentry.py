@@ -40,7 +40,7 @@ class LogEntry(metaclass=LogMeta):
 
 
 class RequestLog(LogEntry):
-    _special_keys = ("request",)
+    _special_keys: ClassVar = ("request",)
 
     @property
     def request(self):
@@ -52,7 +52,7 @@ class RequestLog(LogEntry):
 
 
 class PerfLog(LogEntry):
-    _special_keys = ("perf",)
+    _special_keys: ClassVar = ("perf",)
 
     @property
     def perf(self):
@@ -65,7 +65,7 @@ class PerfLog(LogEntry):
 
 
 class ColdstartLog(LogEntry):
-    _special_keys = ("coldstart",)
+    _special_keys: ClassVar = ("coldstart",)
 
     @property
     def coldstart(self):
