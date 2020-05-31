@@ -1,67 +1,37 @@
-from typing import Union
+from typing import List, Callable, Dict
+from collections import defaultdict, Counter
 
-from .logentry import RequestLog, PerfLog
-
-
-class ContextGroup:
-    """A group of log entries that form a single function call."""
-    def __init__(self):
-        self._entries = []
-        self._context_id = None
-
-    @property
-    def entries(self):
-        return self._entries.copy()
-
-    @property
-    def context_id(self):
-        return self._context_id
-
-    def _has_request(self):
-        return any(isinstance(e, RequestLog) for e in self._entries)
-
-    def add(self, entry: Union[RequestLog, PerfLog]) -> bool:
-        """Add entries to the context group, return True/False based on whether
-        the added entry was valid or not."""
-        # for now only allow a single request log
-        if self._has_request() and isinstance(entry, RequestLog):
-            return False
-
-        new_entries = self._entries + [entry]
-        try:
-            merged_id = self._merge_context_ids(new_entries)
-        except ValueError:
-            return False
-
-        if (self._context_id is not None) <= (self._context_id == merged_id):
-            self._context_id = merged_id
-            self._entries = new_entries
-        else:
-            return False
-
-        return True
-
-    @staticmethod
-    def _merge_context_ids(entries):
-        """Attempt to merge given logs into a single call ID."""
-        context_ids = {e.context_id for e in entries if e.context_id is not None}
-        if len(context_ids) == 1:
-            return next(iter(context_ids))
-        elif len(context_ids) == 0:
-            return None
-        else:
-            raise ValueError("Ambiguous context ID")
-
-    def __repr__(self):
-        return f"Context({self.context_id}):{len(self._entries)}"
+from .logentry import LogEntry
 
 
-def create_context_groups(entries):
-    context_groups = []
-    context_group = ContextGroup()
-    for entry in sorted(entries, key=lambda e: e.timestamp):
-        if not context_group.add(entry):
-            context_groups.append(context_group)
-            context_group = ContextGroup()
-            context_group.add(entry)
-    return context_groups
+def print_group(grouped_data: dict):
+    """Print the group. Mainly for debugging purposes."""
+    lines = [
+        "### Grouped data overview",
+    ]
+    for name, entries in grouped_data.items():
+        title = "# {}: {} entries".format(name, len(entries))
+        types = "#   " + ", ".join(
+            f"{k}({v})" for k, v in Counter([e.__class__.__name__ for e in entries]).items()
+        )
+        lines += (title, types)
+    lines.append("###")
+    text = "\n".join(lines)
+
+    print(text)
+
+
+def group_by(data: List[LogEntry], key: Callable) -> Dict[str, List[LogEntry]]:
+    """Group by the given key or callable."""
+    grouped = defaultdict(list)
+    for entry in data:
+        grouped[key(entry)].append(entry)
+    return grouped
+
+
+def group_by_context(entries):
+    return group_by(entries, lambda e: e.context_id)
+
+
+def group_by_function(entries):
+    return group_by(entries, lambda e: e.fn["name"])

@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from json_coder import register
 
 from .logentry import LogEntry, RequestLog, PerfLog, cast_log_type
-from .contextgroup import ContextGroup, create_context_groups
 
 
 __version__ = "0.9.0"
