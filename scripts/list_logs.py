@@ -16,6 +16,7 @@ def _lprint(*args, level=0, lead=">"):
 def _print_log_folder(logdir: pathlib.Path, level: int):
     """Print the given directory."""
     lprint = lambda m: _lprint(m, level=level, lead=" ")
+    lprint_detail = lambda ms: list(map(lambda m: _lprint(m, level=level + 1, lead=" "), ms))
 
     _lprint(logdir.name, level=level)
 
@@ -23,9 +24,14 @@ def _print_log_folder(logdir: pathlib.Path, level: int):
     lprint(f"Total entries: {len(all_entries)}")
 
     platform_entries = Counter([e.platform for e in all_entries])
-    lprint("Platforms: " + ", ".join(f"{k}: {v}" for k, v in platform_entries.items()))
+    lprint("Platforms: ")
+    lprint_detail(f"{k}: {v}" for k, v in platform_entries.items())
     version = Counter([e.data.get("version", "NA") for e in all_entries])
-    lprint("Versions: " + ", ".join(f"{k}: {v}" for k, v in version.items()))
+    lprint("Versions: ")
+    lprint_detail(f"{k}: {v}" for k, v in version.items())
+    dates = Counter([e.timestamp.date() for e in all_entries])
+    lprint("Dates: ")
+    lprint_detail(f"{k.isoformat()}: {v}" for k, v in dates.items())
 
 
 def _walk_dirs(logdir: pathlib.Path, level: int = 0):
