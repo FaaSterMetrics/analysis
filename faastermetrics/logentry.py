@@ -38,6 +38,10 @@ class LogEntry(metaclass=LogMeta):
             raise NotImplementedError("Cannot match log data without defined identifying keys.")
         return all(key in event.event for key in cls._special_keys)
 
+    @property
+    def context_id(self):
+        return None
+
 
 class RequestLog(LogEntry):
     _special_keys: ClassVar = ("request",)
@@ -48,7 +52,7 @@ class RequestLog(LogEntry):
 
     @property
     def context_id(self):
-        return self.request["headers"].get("x-context", None)
+        return self.event["contextId"]
 
 
 class PerfLog(LogEntry):
@@ -58,10 +62,17 @@ class PerfLog(LogEntry):
     def perf(self):
         return self.event["perf"]
 
+    def _get_perf_name(self):
+        splitted = self.perf["name"].split(":")
+        fname, context_id, *perftype, xpair = splitted
+        perftype = ":".join(perftype)
+        print(perftype)
+        return fname, context_id, perftype, xpair
+
     @property
     def context_id(self):
-        mark = self.perf["mark"]
-        return mark.split(":")[0]
+        _, context_id, *_ = self._get_perf_name()
+        return context_id
 
 
 class ColdstartLog(LogEntry):
