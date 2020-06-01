@@ -5,6 +5,9 @@ from dataclasses import dataclass, asdict
 from json_coder import jsonify
 
 
+UNDEFINED_XPAIR = "undefined-x-pair"
+
+
 LOG_SUBTYPES = []
 
 
@@ -25,6 +28,10 @@ class LogEntry(metaclass=LogMeta):
     platform: str
 
     @property
+    def id(self):
+        return (self.context_id, self.x_pair)
+
+    @property
     def event(self):
         return self.data["event"]
 
@@ -39,6 +46,10 @@ class LogEntry(metaclass=LogMeta):
         return all(key in event.event for key in cls._special_keys)
 
     @property
+    def x_pair(self):
+        return UNDEFINED_XPAIR
+
+    @property
     def context_id(self):
         return None
 
@@ -49,6 +60,11 @@ class RequestLog(LogEntry):
     @property
     def request(self):
         return self.event["request"]
+
+    @property
+    def x_pair(self):
+        _, xpair = self.request["headers"].get("x-pair", f"-{UNDEFINED_XPAIR}").split("-", 1)
+        return xpair
 
     @property
     def context_id(self):
@@ -71,6 +87,16 @@ class PerfLog(LogEntry):
         fname, context_id, *perftype, xpair = splitted
         perftype = ":".join(perftype)
         return fname, context_id, perftype, xpair
+
+    @property
+    def x_pair(self):
+        *_, cid_xpair = self._get_perf_name()
+
+        if cid_xpair == UNDEFINED_XPAIR:
+            return cid_xpair
+
+        _, xpair = cid_xpair.split("-", 1)
+        return xpair
 
     @property
     def context_id(self):

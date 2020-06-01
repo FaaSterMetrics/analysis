@@ -19,10 +19,13 @@ import faastermetrics.helper as fg
 from faastermetrics.perflog import create_requestgroups
 
 
-def get_runtime(rgroup):
-    incalls = rgroup.get_rpc_in()
-    measure, = filter(lambda e: e.perf["entryType"] == "measure", incalls)
-    return measure.perf["duration"]
+def get_runtime(perfs):
+    try:
+        measure, = filter(lambda e: e.perf["entryType"] == "measure", perfs)
+        duration = measure.perf["duration"]
+    except ValueError:
+        duration = None
+    return duration
 
 
 def build_graph(rgroups):
@@ -45,10 +48,10 @@ def build_graph(rgroups):
                     e.perf["duration"] for e in outentries
                     if function in e.perf_name and e.perf["entryType"] == "measure"
                 ]
-                inner_times = [
-                    get_runtime(rg) for rg in rgroups
+                inner_times = [d for d in [
+                    get_runtime(rg.get_rpc_in()) for rg in rgroups
                     if rg.context_id == rgroup.context_id and rg.function == function
-                ]
+                ] if d is not None]
                 if graph.has_edge(rgroup.function, function):
                     graph.edges[rgroup.function, function]["outer_times"] += outer_times
                     graph.edges[rgroup.function, function]["inner_times"] += inner_times
@@ -59,8 +62,25 @@ def build_graph(rgroups):
     for edge in graph.edges:
         graph.edges[edge]["median_outer"] = np.round(np.median(graph.edges[edge]["outer_times"]) * 1, 2)
         graph.edges[edge]["median_inner"] = np.round(np.median(graph.edges[edge]["inner_times"]) * 1, 2)
+        graph.edges[edge]["transport_simple"] = (graph.edges[edge]["median_outer"] - graph.edges[edge]["median_inner"]) / 2
 
     return graph
+
+
+def plot_graph(graph, plotdir, key="transport_simple"):
+    pos = nx.spring_layout(graph, weight=key, k=10/np.sqrt(len(graph.nodes)))
+
+    pos_higher = {}
+    y_off = 0.05  # offset on the y axis
+    for k, v in pos.items():
+        pos_higher[k] = (v[0], v[1]+y_off)
+
+    fig, ax = plt.subplots(figsize=(12, 8))
+    nx.draw(graph, pos, edgecolors="black", node_color="white")
+    nx.draw_networkx_labels(graph, pos_higher)
+    nx.draw_networkx_edge_labels(graph, pos, edge_labels=nx.get_edge_attributes(graph, key))
+    plt.savefig(plotdir / f"fgraph_{key}.png", dpi=300)
+    plt.close()
 
 
 def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path):
@@ -69,23 +89,14 @@ def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path):
     rgroups = create_requestgroups(data)
     graph = build_graph(rgroups)
 
-    pos = nx.spring_layout(graph, weight="median_outer", k=10/np.sqrt(len(graph.nodes)))
-
-    pos_higher = {}
-    y_off = 0.05  # offset on the y axis
-    for k, v in pos.items():
-        pos_higher[k] = (v[0], v[1]+y_off)
-
-    plt.subplot(111, dpi=300)
-    nx.draw(graph, pos, edgecolors="black", node_color="white")
-    nx.draw_networkx_labels(graph, pos_higher)
-    nx.draw_networkx_edge_labels(graph, pos, edge_labels=nx.get_edge_attributes(graph, "median_outer"))
-    plt.savefig(plotdir / "fgraph_median_outer.png")
+    plot_graph(graph, plotdir, key="transport_simple")
+    plot_graph(graph, plotdir, key="median_inner")
+    plot_graph(graph, plotdir, key="median_outer")
 
 
 def main(data: pathlib.Path, output: pathlib.Path):
-    data = pathlib.Path("output/logdumps/platform_aws.json")
-    output = pathlib.Path("output/plots/")
+    # data = pathlib.Path("output/logdumps/platform_aws.json")
+    # output = pathlib.Path("output/plots/")
 
     output = output / data.stem
     output.mkdir(parents=True, exist_ok=True)
@@ -95,5 +106,5 @@ def main(data: pathlib.Path, output: pathlib.Path):
 
 
 if __name__ == "__main__":
-    # argmagic(main, positional=("data", "output"))
-    main("", "")
+    argmagic(main, positional=("data", "output"))
+    # main("", "")
