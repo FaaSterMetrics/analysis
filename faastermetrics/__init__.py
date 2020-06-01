@@ -66,8 +66,9 @@ def _parse_entry(raw_entry: str, platform: str) -> LogEntry:
         return None
     json_start = start_pos + len(MESSAGE_TAG)
 
-    raw_entry = raw_entry.encode("utf-8").decode("unicode_escape")
-    obj, _ = decoder.raw_decode(raw_entry[json_start:])
+    dec_entry = raw_entry[json_start:].encode("utf-8").decode("unicode_escape")
+    dec_entry = "".join(c for c in dec_entry if c not in ("\x0e", "\x12", "\x14", "\n"))
+    obj, _ = decoder.raw_decode(dec_entry)
 
     timestamp = datetime.datetime.fromtimestamp(obj["timestamp"] / 1000)
 
