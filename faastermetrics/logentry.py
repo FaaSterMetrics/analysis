@@ -62,11 +62,14 @@ class PerfLog(LogEntry):
     def perf(self):
         return self.event["perf"]
 
+    @property
+    def perf_name(self):
+        return self.perf["name"]
+
     def _get_perf_name(self):
-        splitted = self.perf["name"].split(":")
+        splitted = self.perf_name.split(":")
         fname, context_id, *perftype, xpair = splitted
         perftype = ":".join(perftype)
-        print(perftype)
         return fname, context_id, perftype, xpair
 
     @property

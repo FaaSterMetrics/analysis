@@ -69,4 +69,4 @@ dependencies:
   - pip:
     - argmagic
     - json_coder
-
+    - networkx
