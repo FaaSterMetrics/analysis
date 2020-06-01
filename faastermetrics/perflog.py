@@ -5,7 +5,7 @@ from typing import List
 from dataclasses import dataclass, field
 
 from .logentry import LogEntry, RequestLog, PerfLog
-from . import contextgroup as cg
+from . import helper as cg
 from .helper import group_by_function, group_by_context, uniq_by
 
 
