@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from .logentry import LogEntry, RequestLog, PerfLog
 from . import contextgroup as cg
-from .contextgroup import group_by_function, group_by_context, uniq_by
+from .helper import group_by_function, group_by_context, uniq_by
 
 
 @dataclass

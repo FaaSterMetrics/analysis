@@ -15,7 +15,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 import faastermetrics as fm
-import faastermetrics.contextgroup as fg
+import faastermetrics.helper as fg
 from faastermetrics.perflog import create_requestgroups
 
 
