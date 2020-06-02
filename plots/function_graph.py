@@ -174,7 +174,7 @@ def build_graph(rgroups):
         for rg in rgroups for rout in rg.get_rpc_out()
     ])
 
-    nx.set_node_attributes(graph, "bold", "style")
+    # nx.set_node_attributes(graph, "bold", "style")
     nx.set_node_attributes(graph, get_rpc_in_median(rgroups), "duration")
     nx.set_node_attributes(graph, get_num_calls(rgroups), "calls")
     nx.set_node_attributes(graph, get_platform(rgroups), "platform")
