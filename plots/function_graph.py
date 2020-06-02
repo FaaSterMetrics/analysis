@@ -125,6 +125,7 @@ def format_edge_labels(graph):
         e_outer = outer.get(edge, None)
         e_trans = trans.get(edge, None)
 
+        # TODO: fix negative values
         # labels[edge] = f"Total: {e_outer:.2f}ms\nTransport: {e_trans:.2f}ms"
         labels[edge] = f"Total: {e_outer:.2f}ms"
 
