@@ -110,7 +110,7 @@ def format_node_labels(graph):
         if fduration is None:
             label = f"{fname}\n({fcalls} calls)"
         else:
-            label = f"{fname}\n({fcalls} calls, ~{fduration:.2f}ms)"
+            label = f"{fname}\n({fcalls} calls, {fduration:.2f}ms)"
         labels[fname] = label
 
     return labels
@@ -125,7 +125,8 @@ def format_edge_labels(graph):
         e_outer = outer.get(edge, None)
         e_trans = trans.get(edge, None)
 
-        labels[edge] = f"Total: {e_outer:.2f}ms\nTransport: {e_trans:.2f}ms"
+        # labels[edge] = f"Total: {e_outer:.2f}ms\nTransport: {e_trans:.2f}ms"
+        labels[edge] = f"Total: {e_outer:.2f}ms"
 
     return labels
 
