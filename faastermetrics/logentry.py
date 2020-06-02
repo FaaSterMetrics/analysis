@@ -95,6 +95,8 @@ class PerfLog(LogEntry):
         if cid_xpair == UNDEFINED_XPAIR:
             return cid_xpair
 
+        print(self.perf)
+        print(self.perf_name, cid_xpair)
         _, xpair = cid_xpair.split("-", 1)
         return xpair
 

@@ -4,22 +4,21 @@ Plot a graph representation of the logs.
 """
 from typing import List
 import pathlib
-from argmagic import argmagic
+from collections import defaultdict, Counter
 
+from argmagic import argmagic
 import numpy as np
 
 import networkx as nx
-
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+from networkx.drawing.nx_agraph import graphviz_layout, to_agraph
+import pygraphviz as pgv
 
 import faastermetrics as fm
 import faastermetrics.helper as fg
 from faastermetrics.requestgroup import create_requestgroups
 
 
-def get_runtime(perfs):
+def get_duration(perfs):
     try:
         measure, = filter(lambda e: e.perf["entryType"] == "measure", perfs)
         duration = measure.perf["duration"]
@@ -28,68 +27,140 @@ def get_runtime(perfs):
     return duration
 
 
+def get_rpc_in_duration(rgroups):
+    """Calculate request times based on rpcIn."""
+    all_durations = defaultdict(list)
+    for rgroup in rgroups:
+        # find outgoing calls
+        rpc_in = rgroup.get_rpc_in()
+        duration = get_duration(rpc_in)
+        if duration is not None:
+            all_durations[rgroup.function].append(duration)
+    return all_durations
+
+
+def reduce_dict(data, fun):
+    return {k: fun(v) for k, v in data.items()}
+
+
+def get_rpc_in_median(rgroups):
+    durations = get_rpc_in_duration(rgroups)
+    return reduce_dict(durations, np.median)
+
+
+def get_num_calls(rgroups):
+    return Counter([rgroup.function for rgroup in rgroups])
+
+
+def get_rpc_out_duration(rgroups):
+    """Calculate durations based on rpcOut."""
+    times = defaultdict(list)
+    for rgroup in rgroups:
+        # iterate over outer duration measurements
+        rpc_out = [e for e in rgroup.get_rpc_out() if e.perf["entryType"] == "measure"]
+        for entry in rpc_out:
+            called_fname = entry.perf["mark"].split(":")[-1]
+            outer_duration = entry.perf["duration"]
+
+            times[(rgroup.function, called_fname)].append(outer_duration)
+
+    return times
+
+
+def get_transport_times(rgroups):
+    times = defaultdict(list)
+    for rgroup in rgroups:
+        # iterate over outer duration measurements
+        rpc_out = [e for e in rgroup.get_rpc_out() if e.perf["entryType"] == "measure"]
+        for entry in rpc_out:
+            called_fname = entry.perf["mark"].split(":")[-1]
+            calleds = [
+                rg for rg in rgroups
+                if rg.context_id == entry.context_id and rg.function == called_fname
+            ]
+            inner_durations = get_rpc_in_median(calleds)
+            if not inner_durations:
+                continue
+            inner_duration = inner_durations[called_fname]
+            outer_duration = entry.perf["duration"]
+
+            times[(rgroup.function, called_fname)].append((outer_duration - inner_duration) / 2)
+
+    return times
+
+
+def get_rpc_out_median(rgroups):
+    outer = get_rpc_out_duration(rgroups)
+    return reduce_dict(outer, np.median)
+
+
+def get_transport_median(rgroups):
+    transport = get_transport_times(rgroups)
+    return reduce_dict(transport, np.median)
+
+
+def format_node_labels(graph):
+    durations = nx.get_node_attributes(graph, "duration")
+    calls = nx.get_node_attributes(graph, "calls")
+
+    labels = {}
+    for fname in calls:
+        fcalls = calls.get(fname, 0)
+        fduration = durations.get(fname, None)
+        if fduration is None:
+            label = f"{fname}\n({fcalls} calls)"
+        else:
+            label = f"{fname}\n({fcalls} calls, ~{fduration:.2f}ms)"
+        labels[fname] = label
+
+    return labels
+
+
+def format_edge_labels(graph):
+    outer = nx.get_edge_attributes(graph, "outer_median")
+    trans = nx.get_edge_attributes(graph, "transport")
+
+    labels = {}
+    for edge in graph.edges:
+        e_outer = outer.get(edge, None)
+        e_trans = trans.get(edge, None)
+
+        labels[edge] = f"Total: {e_outer:.2f}ms\nTransport: {e_trans:.2f}ms"
+
+    return labels
+
+
 def build_graph(rgroups):
     graph = nx.DiGraph()
 
     # add nodes
-    for rgroup in rgroups:
-        if rgroup.function not in graph.nodes:
-            graph.add_node(rgroup.function, cids=[rgroup.context_id])
-        else:
-            graph.nodes[rgroup.function]["cids"].append(rgroup.context_id)
+    graph.add_nodes_from([rg.function for rg in rgroups])
+    graph.add_edges_from([
+        (rg.function, rout.perf["mark"].split(":")[-1])
+        for rg in rgroups for rout in rg.get_rpc_out()
+    ])
 
-    # add edges
-    for rgroup in rgroups:
-        outentries = rgroup.get_rpc_out()
-        if outentries:
-            functions = fg.uniq_by(outentries, lambda e: e.perf["mark"].split(":")[-1])
-            for function in functions:
-                outer_times = [
-                    e.perf["duration"] for e in outentries
-                    if function in e.perf_name and e.perf["entryType"] == "measure"
-                ]
-                inner_times = [d for d in [
-                    get_runtime(rg.get_rpc_in()) for rg in rgroups
-                    if rg.context_id == rgroup.context_id and rg.function == function
-                ] if d is not None]
-                if graph.has_edge(rgroup.function, function):
-                    graph.edges[rgroup.function, function]["outer_times"] += outer_times
-                    graph.edges[rgroup.function, function]["inner_times"] += inner_times
-                else:
-                    graph.add_edge(rgroup.function, function, outer_times=outer_times, inner_times=inner_times)
+    nx.set_node_attributes(graph, get_rpc_in_duration(rgroups), "duration")
+    nx.set_node_attributes(graph, get_num_calls(rgroups), "calls")
+    nx.set_node_attributes(graph, format_node_labels(graph), "label")
 
-
-    for edge in graph.edges:
-        graph.edges[edge]["median_outer"] = np.round(np.median(graph.edges[edge]["outer_times"]) * 1, 2)
-        graph.edges[edge]["median_inner"] = np.round(np.median(graph.edges[edge]["inner_times"]) * 1, 2)
+    nx.set_edge_attributes(graph, get_rpc_out_duration(rgroups), "outer_median")
+    nx.set_edge_attributes(graph, get_transport_median(rgroups), "transport")
+    nx.set_edge_attributes(graph, format_edge_labels(graph), "label")
 
     return graph
 
 
-def set_graph_weight(graph, key):
+def set_graph_weight(graph, key, dest_key="weight"):
     max_val = np.max(list(nx.get_edge_attributes(graph, key).values()))
     for edge in graph.edges:
-        graph.edges[edge]["weight"] = max_val + 1 - graph.edges[edge][key]
-
+        graph.edges[edge][dest_key] = max_val + 1 - graph.edges[edge][key]
 
 
 def plot_graph(graph, plotdir, key="median_outer"):
-    set_graph_weight(graph, key)
-    pos = nx.random_layout(graph)
-    pos = nx.spring_layout(graph, pos=pos, iterations=100, threshold=0.0, weight="weight", k=100/np.sqrt(len(graph.nodes)))
-    # pos = nx.kamada_kawai_layout(graph, pos=pos, weight="weight")
-
-    pos_higher = {}
-    y_off = 0.1  # offset on the y axis
-    for k, v in pos.items():
-        pos_higher[k] = (v[0], v[1]+y_off)
-
-    fig, ax = plt.subplots(figsize=(12, 8))
-    nx.draw(graph, pos, edgecolors="black", node_color="white")
-    nx.draw_networkx_labels(graph, pos_higher)
-    nx.draw_networkx_edge_labels(graph, pos, edge_labels=nx.get_edge_attributes(graph, key))
-    plt.savefig(plotdir / f"fgraph_{key}.png", dpi=300)
-    plt.close()
+    A = to_agraph(graph)
+    A.layout("dot")
+    A.draw(str(plotdir / f"gviz_fgraph_{key}.png"))
 
 
 def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path):
@@ -98,15 +169,10 @@ def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path):
     rgroups = create_requestgroups(data)
     graph = build_graph(rgroups)
 
-    # plot_graph(graph, plotdir, key="transport_simple")
-    # plot_graph(graph, plotdir, key="median_inner")
     plot_graph(graph, plotdir, key="median_outer")
 
 
 def main(data: pathlib.Path, output: pathlib.Path):
-    # data = pathlib.Path("output/logdumps/platform_aws.json")
-    # output = pathlib.Path("output/plots/")
-
     output = output / data.stem
     output.mkdir(parents=True, exist_ok=True)
 
@@ -116,4 +182,3 @@ def main(data: pathlib.Path, output: pathlib.Path):
 
 if __name__ == "__main__":
     argmagic(main, positional=("data", "output"))
-    # main("", "")
