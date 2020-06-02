@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 import faastermetrics as fm
 import faastermetrics.helper as fg
-from faastermetrics.perflog import create_requestgroups
+from faastermetrics.requestgroup import create_requestgroups
 
 
 def get_runtime(perfs):
