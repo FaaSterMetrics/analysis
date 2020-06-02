@@ -142,11 +142,11 @@ def build_graph(rgroups):
         for rg in rgroups for rout in rg.get_rpc_out()
     ])
 
-    nx.set_node_attributes(graph, get_rpc_in_duration(rgroups), "duration")
+    nx.set_node_attributes(graph, get_rpc_in_median(rgroups), "duration")
     nx.set_node_attributes(graph, get_num_calls(rgroups), "calls")
     nx.set_node_attributes(graph, format_node_labels(graph), "label")
 
-    nx.set_edge_attributes(graph, get_rpc_out_duration(rgroups), "outer_median")
+    nx.set_edge_attributes(graph, get_rpc_out_median(rgroups), "outer_median")
     nx.set_edge_attributes(graph, get_transport_median(rgroups), "transport")
     nx.set_edge_attributes(graph, format_edge_labels(graph), "label")
 
