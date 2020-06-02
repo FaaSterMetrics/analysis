@@ -62,16 +62,25 @@ def build_graph(rgroups):
     for edge in graph.edges:
         graph.edges[edge]["median_outer"] = np.round(np.median(graph.edges[edge]["outer_times"]) * 1, 2)
         graph.edges[edge]["median_inner"] = np.round(np.median(graph.edges[edge]["inner_times"]) * 1, 2)
-        graph.edges[edge]["transport_simple"] = (graph.edges[edge]["median_outer"] - graph.edges[edge]["median_inner"]) / 2
 
     return graph
 
 
-def plot_graph(graph, plotdir, key="transport_simple"):
-    pos = nx.spring_layout(graph, weight=key, k=10/np.sqrt(len(graph.nodes)))
+def set_graph_weight(graph, key):
+    max_val = np.max(list(nx.get_edge_attributes(graph, key).values()))
+    for edge in graph.edges:
+        graph.edges[edge]["weight"] = max_val + 1 - graph.edges[edge][key]
+
+
+
+def plot_graph(graph, plotdir, key="median_outer"):
+    set_graph_weight(graph, key)
+    pos = nx.random_layout(graph)
+    pos = nx.spring_layout(graph, pos=pos, iterations=100, threshold=0.0, weight="weight", k=100/np.sqrt(len(graph.nodes)))
+    # pos = nx.kamada_kawai_layout(graph, pos=pos, weight="weight")
 
     pos_higher = {}
-    y_off = 0.05  # offset on the y axis
+    y_off = 0.1  # offset on the y axis
     for k, v in pos.items():
         pos_higher[k] = (v[0], v[1]+y_off)
 
@@ -89,8 +98,8 @@ def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path):
     rgroups = create_requestgroups(data)
     graph = build_graph(rgroups)
 
-    plot_graph(graph, plotdir, key="transport_simple")
-    plot_graph(graph, plotdir, key="median_inner")
+    # plot_graph(graph, plotdir, key="transport_simple")
+    # plot_graph(graph, plotdir, key="median_inner")
     plot_graph(graph, plotdir, key="median_outer")
 
 
