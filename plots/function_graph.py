@@ -99,6 +99,22 @@ def get_transport_median(rgroups):
     return reduce_dict(transport, np.median)
 
 
+def get_platform(rgroups):
+    entry_platforms = defaultdict(list)
+    for rgroup in rgroups:
+        entry_platforms[rgroup.function] += [e.platform for e in rgroup.entries]
+
+    platforms = {}
+    for fun, fplatforms in entry_platforms.items():
+        uniq_platforms = set(fplatforms)
+        if len(uniq_platforms) != 1:
+            for rgroup in [r for r in rgroups if r.function == fun]:
+                print(rgroup.entries[0].timestamp, rgroup.entries[0].platform)
+            raise RuntimeError(f"{fun} has wrong platform number: {uniq_platforms}")
+        platforms[fun] = next(iter(uniq_platforms))
+    return platforms
+
+
 def format_node_labels(graph):
     durations = nx.get_node_attributes(graph, "duration")
     calls = nx.get_node_attributes(graph, "calls")
@@ -127,9 +143,25 @@ def format_edge_labels(graph):
 
         # TODO: fix negative values
         # labels[edge] = f"Total: {e_outer:.2f}ms\nTransport: {e_trans:.2f}ms"
-        labels[edge] = f"Total: {e_outer:.2f}ms"
+        labels[edge] = f"rpcOut: {e_outer:.2f}ms"
 
     return labels
+
+
+def format_node_color(graph):
+    platform = nx.get_node_attributes(graph, "platform")
+
+    platform_colors = {
+        "aws": "#eb7720",
+        "google": "#e34335",
+        "azure": "#0090C2",
+    }
+
+    node_fillcolor = {}
+    for node in graph.nodes:
+        node_fillcolor[node] = platform_colors[platform[node]]
+
+    return node_fillcolor
 
 
 def build_graph(rgroups):
@@ -142,12 +174,16 @@ def build_graph(rgroups):
         for rg in rgroups for rout in rg.get_rpc_out()
     ])
 
+    nx.set_node_attributes(graph, "bold", "style")
     nx.set_node_attributes(graph, get_rpc_in_median(rgroups), "duration")
     nx.set_node_attributes(graph, get_num_calls(rgroups), "calls")
+    nx.set_node_attributes(graph, get_platform(rgroups), "platform")
     nx.set_node_attributes(graph, format_node_labels(graph), "label")
+    nx.set_node_attributes(graph, format_node_color(graph), "color")
 
     nx.set_edge_attributes(graph, get_rpc_out_median(rgroups), "outer_median")
     nx.set_edge_attributes(graph, get_transport_median(rgroups), "transport")
+
     nx.set_edge_attributes(graph, format_edge_labels(graph), "label")
 
     return graph
@@ -161,6 +197,7 @@ def set_graph_weight(graph, key, dest_key="weight"):
 
 def plot_graph(graph, plotdir, key="median_outer"):
     A = to_agraph(graph)
+    A.graph_attr.update(rankdir="LR")
     A.layout("dot")
     A.draw(str(plotdir / f"gviz_fgraph_{key}.png"))
 
