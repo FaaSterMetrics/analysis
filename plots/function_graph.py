@@ -208,7 +208,10 @@ def cluster_graph_on(A, node_vals):
 def plot_graph(graph, plotdir, key="median_outer", cluster_key="platform"):
     A = to_agraph(graph)
     A.graph_attr.update(rankdir="LR")
-    cluster_graph_on(A, nx.get_node_attributes(graph, cluster_key))
+
+    if cluster_key is not None:
+        cluster_graph_on(A, nx.get_node_attributes(graph, cluster_key))
+
     A.layout("dot")
     A.draw(str(plotdir / f"gviz_fgraph_{key}.png"))
 
