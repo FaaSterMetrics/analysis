@@ -179,7 +179,7 @@ def build_graph(rgroups):
     nx.set_node_attributes(graph, get_num_calls(rgroups), "calls")
     nx.set_node_attributes(graph, get_platform(rgroups), "platform")
     nx.set_node_attributes(graph, format_node_labels(graph), "label")
-    nx.set_node_attributes(graph, format_node_color(graph), "color")
+    # nx.set_node_attributes(graph, format_node_color(graph), "color")
 
     nx.set_edge_attributes(graph, get_rpc_out_median(rgroups), "outer_median")
     nx.set_edge_attributes(graph, get_transport_median(rgroups), "transport")
@@ -195,9 +195,20 @@ def set_graph_weight(graph, key, dest_key="weight"):
         graph.edges[edge][dest_key] = max_val + 1 - graph.edges[edge][key]
 
 
-def plot_graph(graph, plotdir, key="median_outer"):
+def cluster_graph_on(A, node_vals):
+    val_nodes = defaultdict(list)
+    for node, value in node_vals.items():
+        val_nodes[value].append(node)
+
+    for value, nodes in val_nodes.items():
+        subgraph_name = f"cluster_{value}"
+        A.add_subgraph(nodes, name=subgraph_name, label=value)
+
+
+def plot_graph(graph, plotdir, key="median_outer", cluster_key="platform"):
     A = to_agraph(graph)
     A.graph_attr.update(rankdir="LR")
+    cluster_graph_on(A, nx.get_node_attributes(graph, cluster_key))
     A.layout("dot")
     A.draw(str(plotdir / f"gviz_fgraph_{key}.png"))
 
