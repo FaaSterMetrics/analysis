@@ -206,6 +206,12 @@ def cluster_graph_on(A, node_vals):
 
 
 def plot_graph(graph, plotdir, key="median_outer", cluster_key="platform"):
+    # add request nodes
+    for node in list(graph.nodes.keys()):
+        if len(graph.out_edges(node)) > 0 and len(graph.in_edges(node)) == 0:
+            graph.add_node("__req_origin__", label="", height=0.2, width=0.2)
+            graph.add_edge("__req_origin__", node)
+
     A = to_agraph(graph)
     A.graph_attr.update(rankdir="LR")
 
