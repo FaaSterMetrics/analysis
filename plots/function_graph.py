@@ -15,7 +15,7 @@ import pygraphviz as pgv
 
 import faastermetrics as fm
 import faastermetrics.helper as fg
-from faastermetrics.requestgroup import create_requestgroups
+from faastermetrics.calls import create_requestgroups
 
 
 def get_duration(perfs):

@@ -6,6 +6,11 @@ from json_coder import jsonify
 
 
 UNDEFINED_XPAIR = "undefined-x-pair"
+ROUTED_TYPES = ("get", "post", "put", "patch", "del", "all")
+INCOMING_REQ_TYPES = ("rpcIn", *ROUTED_TYPES)
+OUTGOING_REQ_TYPES = ("rpcOut",)
+MARK_START = "start"
+MARK_END = "end"
 
 
 LOG_SUBTYPES = []
@@ -39,6 +44,10 @@ class LogEntry(metaclass=LogMeta):
     def fn(self):
         return self.data["fn"]
 
+    @property
+    def function(self):
+        return self.fn["name"]
+
     @classmethod
     def match(cls, event):
         if not cls._special_keys:
@@ -47,11 +56,15 @@ class LogEntry(metaclass=LogMeta):
 
     @property
     def x_pair(self):
-        return UNDEFINED_XPAIR
+        label_xpair = self.event.get("xPair", UNDEFINED_XPAIR)
+        if label_xpair == UNDEFINED_XPAIR:
+            return UNDEFINED_XPAIR
+        _, xpair = label_xpair.split("-")
+        return xpair
 
     @property
     def context_id(self):
-        return None
+        return self.event.get("contextId", None)
 
 
 class RequestLog(LogEntry):
@@ -60,15 +73,6 @@ class RequestLog(LogEntry):
     @property
     def request(self):
         return self.event["request"]
-
-    @property
-    def x_pair(self):
-        _, xpair = self.request["headers"].get("x-pair", f"-{UNDEFINED_XPAIR}").split("-", 1)
-        return xpair
-
-    @property
-    def context_id(self):
-        return self.event["contextId"]
 
 
 class PerfLog(LogEntry):
@@ -79,31 +83,42 @@ class PerfLog(LogEntry):
         return self.event["perf"]
 
     @property
+    def type(self):
+        return self.perf["entryType"]
+
+    @property
+    def perf_type(self):
+        mark_type, perf_type, *_ = self.perf["mark"].split(":")
+        return (mark_type, perf_type)
+
+    @property
+    def perf_type_data(self):
+        perfs = self.perf["mark"].split(":")
+        if len(perfs) < 3:
+            return ""
+        return ":".join(perfs[2:])
+
+    @property
     def perf_name(self):
         return self.perf["name"]
 
     def _get_perf_name(self):
         splitted = self.perf_name.split(":")
-        fname, context_id, *perftype, xpair = splitted
+        fname, context_id, xpair, *perftype = splitted
         perftype = ":".join(perftype)
-        return fname, context_id, perftype, xpair
+        return fname, context_id, xpair, perftype
 
-    @property
-    def x_pair(self):
-        *_, cid_xpair = self._get_perf_name()
+    @staticmethod
+    def is_incoming_entry(entry):
+        return any(t == entry.perf_type[1] for t in INCOMING_REQ_TYPES)
 
-        if cid_xpair == UNDEFINED_XPAIR:
-            return cid_xpair
+    @staticmethod
+    def is_routed_entry(entry):
+        return any(t == entry.perf_type[1] for t in ROUTED_TYPES)
 
-        print(self.perf)
-        print(self.perf_name, cid_xpair)
-        _, xpair = cid_xpair.split("-", 1)
-        return xpair
-
-    @property
-    def context_id(self):
-        _, context_id, *_ = self._get_perf_name()
-        return context_id
+    @staticmethod
+    def is_outgoing_entry(entry):
+        return any(t == entry.perf_type[1] for t in OUTGOING_REQ_TYPES)
 
 
 class ColdstartLog(LogEntry):

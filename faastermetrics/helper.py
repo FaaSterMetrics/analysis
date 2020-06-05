@@ -44,6 +44,15 @@ def uniq_by(data: List[LogEntry], key: Callable) -> list:
     return list({key(d) for d in data})
 
 
+def get_one(data: List[LogEntry], filterfun: Callable) -> LogEntry:
+    """Get a single entry and assert that after filtering only a single entry
+    remains."""
+    filtered = list(filter(filterfun, data))
+    if len(filtered) != 1:
+        raise ValueError(f"Entries not unique after filtering: {filtered}")
+    return filtered[0]
+
+
 def group_by_context(entries):
     return group_by(entries, lambda e: e.context_id)
 

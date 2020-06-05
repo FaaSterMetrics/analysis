@@ -8,6 +8,18 @@ from collections import defaultdict, Counter
 
 from argmagic import argmagic
 import faastermetrics as fm
+import faastermetrics.helper as fh
+import faastermetrics.calls as fr
+
+
+def print_request_tree(entries: List[fm.LogEntry]):
+    """Print requests based on their xpairs and context ids."""
+    group_data = fh.group_by(entries, lambda e: e.id)
+    fh.print_group(group_data)
+
+    rgs = fr.create_requestgroups(entries)
+    for call in rgs:
+        print(call)
 
 
 def print_function_tree(entries: List[fm.LogEntry]):
@@ -37,6 +49,8 @@ def main(logdump: pathlib.Path):
     data = fm.load_logs(logdump)
 
     print_function_tree(data)
+
+    print_request_tree(data)
 
 
 if __name__ == "__main__":
