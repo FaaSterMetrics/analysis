@@ -75,6 +75,10 @@ def request_to_call(entries: List[LogEntry]) -> Call:
         single_request_to_call(e)
         for e in group_by(outgoing_entries, lambda e: e.perf_type_data).values()
     ]
+    request_entries = [e for e in entries if isinstance(e, RequestLog)]
+    if len(request_entries) > 1:
+        raise ValueError(f"Too many request entries in single group: {request_entries}")
+    call.entries += request_entries
     return call
 
 
