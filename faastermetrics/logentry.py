@@ -114,6 +114,18 @@ class ColdstartLog(LogEntry):
         return self.event["coldstart"]
 
 
+class ArtilleryLog(LogEntry):
+    _special_keys: ClassVar = ("url", "type")
+
+    @property
+    def type(self):
+        return self.event["type"]
+
+    @property
+    def url(self):
+        return self.event["url"]
+
+
 def cast_log_type(entry: LogEntry) -> Union[RequestLog, PerfLog]:
     for subtype in LOG_SUBTYPES:
         if subtype.match(entry):
