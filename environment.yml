@@ -71,3 +71,4 @@ dependencies:
     - json_coder
     - networkx
     - pygraphviz
+    - openpyxl 
