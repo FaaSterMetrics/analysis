@@ -10,7 +10,7 @@ from json_coder import register
 from .logentry import LogEntry, RequestLog, PerfLog, cast_log_type
 
 
-__version__ = "2.0.1"
+__version__ = "2.0.2"
 
 register("datetime", datetime.datetime, datetime.datetime.fromisoformat, datetime.datetime.isoformat)
 
