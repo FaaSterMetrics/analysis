@@ -18,34 +18,20 @@ import faastermetrics.helper as fg
 from faastermetrics.calls import create_requestgroups
 
 
-def get_duration(perfs):
-    try:
-        measure, = filter(lambda e: e.perf["entryType"] == "measure", perfs)
-        duration = measure.perf["duration"]
-    except ValueError:
-        duration = None
-    return duration
-
-
 def get_rpc_in_duration(rgroups):
     """Calculate request times based on rpcIn."""
     all_durations = defaultdict(list)
     for rgroup in rgroups:
         # find outgoing calls
-        rpc_in = rgroup.get_rpc_in()
-        duration = get_duration(rpc_in)
+        duration = rgroup.duration
         if duration is not None:
-            all_durations[rgroup.function].append(duration)
+            duration_ms = duration.total_seconds() * 1000
+            all_durations[rgroup.function].append(duration_ms)
     return all_durations
 
 
 def reduce_dict(data, fun):
     return {k: fun(v) for k, v in data.items()}
-
-
-def get_rpc_in_median(rgroups):
-    durations = get_rpc_in_duration(rgroups)
-    return reduce_dict(durations, np.median)
 
 
 def get_num_calls(rgroups):
@@ -57,12 +43,9 @@ def get_rpc_out_duration(rgroups):
     times = defaultdict(list)
     for rgroup in rgroups:
         # iterate over outer duration measurements
-        rpc_out = [e for e in rgroup.get_rpc_out() if e.perf["entryType"] == "measure"]
-        for entry in rpc_out:
-            called_fname = entry.perf["mark"].split(":")[-1]
-            outer_duration = entry.perf["duration"]
-
-            times[(rgroup.function, called_fname)].append(outer_duration)
+        for r_out in rgroup.calls:
+            duration_ms = r_out.duration.total_seconds() * 1000
+            times[(rgroup.function, r_out.function)].append(duration_ms)
 
     return times
 
@@ -71,32 +54,36 @@ def get_transport_times(rgroups):
     times = defaultdict(list)
     for rgroup in rgroups:
         # iterate over outer duration measurements
-        rpc_out = [e for e in rgroup.get_rpc_out() if e.perf["entryType"] == "measure"]
-        for entry in rpc_out:
-            called_fname = entry.perf["mark"].split(":")[-1]
-            calleds = [
-                rg for rg in rgroups
-                if rg.context_id == entry.context_id and rg.function == called_fname
+        for entry in rgroup.calls:
+            matched = [
+                rg for rg in rgroups if rg.id == entry.id and rg.function == entry.function
             ]
-            inner_durations = get_rpc_in_median(calleds)
-            if not inner_durations:
-                continue
-            inner_duration = inner_durations[called_fname]
-            outer_duration = entry.perf["duration"]
+            if len(matched) != 1:
+                raise ValueError(f"{entry} has no matched call entry.")
 
-            times[(rgroup.function, called_fname)].append((outer_duration - inner_duration) / 2)
+            inner_duration = matched[0].duration
+            outer_duration = entry.duration
+            transport = (outer_duration - inner_duration)
+            transport_ms = transport.total_seconds() * 1000
+
+            times[(rgroup.function, entry.function)].append(transport_ms)
 
     return times
 
 
-def get_rpc_out_median(rgroups):
+def get_rpc_in(rgroups, reduce=np.median):
+    durations = get_rpc_in_duration(rgroups)
+    return reduce_dict(durations, reduce)
+
+
+def get_rpc_out(rgroups, reduce=np.median):
     outer = get_rpc_out_duration(rgroups)
-    return reduce_dict(outer, np.median)
+    return reduce_dict(outer, reduce)
 
 
-def get_transport_median(rgroups):
+def get_transport(rgroups, reduce=np.median):
     transport = get_transport_times(rgroups)
-    return reduce_dict(transport, np.median)
+    return reduce_dict(transport, reduce)
 
 
 def get_platform(rgroups):
@@ -133,7 +120,7 @@ def format_node_labels(graph):
 
 
 def format_edge_labels(graph):
-    outer = nx.get_edge_attributes(graph, "outer_median")
+    outer = nx.get_edge_attributes(graph, "outer")
     trans = nx.get_edge_attributes(graph, "transport")
 
     labels = {}
@@ -141,9 +128,7 @@ def format_edge_labels(graph):
         e_outer = outer.get(edge, None)
         e_trans = trans.get(edge, None)
 
-        # TODO: fix negative values
-        # labels[edge] = f"Total: {e_outer:.2f}ms\nTransport: {e_trans:.2f}ms"
-        labels[edge] = f"rpcOut: {e_outer:.2f}ms"
+        labels[edge] = f"Total: {e_outer:.2f}ms\nTransport: {e_trans:.2f}ms"
 
     return labels
 
@@ -170,19 +155,18 @@ def build_graph(rgroups):
     # add nodes
     graph.add_nodes_from([rg.function for rg in rgroups])
     graph.add_edges_from([
-        (rg.function, rout.perf["mark"].split(":")[-1])
-        for rg in rgroups for rout in rg.get_rpc_out()
+        (rg.function, ro.function) for rg in rgroups for ro in rg.calls
     ])
 
     # nx.set_node_attributes(graph, "bold", "style")
-    nx.set_node_attributes(graph, get_rpc_in_median(rgroups), "duration")
+    nx.set_node_attributes(graph, get_rpc_in(rgroups, np.mean), "duration")
     nx.set_node_attributes(graph, get_num_calls(rgroups), "calls")
     nx.set_node_attributes(graph, get_platform(rgroups), "platform")
     nx.set_node_attributes(graph, format_node_labels(graph), "label")
     # nx.set_node_attributes(graph, format_node_color(graph), "color")
 
-    nx.set_edge_attributes(graph, get_rpc_out_median(rgroups), "outer_median")
-    nx.set_edge_attributes(graph, get_transport_median(rgroups), "transport")
+    nx.set_edge_attributes(graph, get_rpc_out(rgroups, np.mean), "outer")
+    nx.set_edge_attributes(graph, get_transport(rgroups, np.mean), "transport")
 
     nx.set_edge_attributes(graph, format_edge_labels(graph), "label")
 
@@ -225,7 +209,7 @@ def plot_graph(graph, plotdir, key="median_outer", cluster_key="platform"):
 def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path):
     """Build the call graph from the given logging data.
     """
-    rgroups = create_requestgroups(data)
+    rgroups = [rg for rg in create_requestgroups(data) if rg.id[0] is not None]
     graph = build_graph(rgroups)
 
     plot_graph(graph, plotdir, key="median_outer")

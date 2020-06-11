@@ -14,13 +14,26 @@ from .helper import group_by_function, group_by, uniq_by
 class Call:
     id: tuple
     function: str
-    start_time: datetime.datetime
-    end_time: datetime.datetime
+    duration: datetime.timedelta
     entries: List[LogEntry]
     calls: List["Call"] = field(default_factory=lambda: list())
 
     @property
-    def duration(self):
+    def start_time(self):
+        if len(self.entries) == 0:
+            return None
+        return sorted(self.entries, key=lambda e: e.timestamp)[0]
+
+    @property
+    def end_time(self):
+        if len(self.entries) == 0:
+            return None
+        return sorted(self.entries, key=lambda e: e.timestamp)[-1]
+
+    @property
+    def log_duration(self):
+        if self.end_time is None or self.start_time is None:
+            return None
         return self.end_time - self.start_time
 
     def __repr__(self):
@@ -36,18 +49,31 @@ def artillery_to_call(entries: List[LogEntry]) -> Call:
     id, = uniq_by(entries, lambda e: e.id)
     start = cg.get_one(entries, lambda e: e.event["type"] == "before")
     end = cg.get_one(entries, lambda e: e.event["type"] == "after")
+    duration = end.timestamp - start.timestamp
+    url, = uniq_by(entries, lambda e: e.url)
+
+    if "/dev/" in url:
+        function = url.split("/dev/")[-1]
+    else:
+        function = url.split("/", 3)[-1]
+
+    calls = [
+        Call(id=id, function=function, entries=[], duration=duration)
+    ]
     return Call(
         id=id,
         function="artillery",
-        start_time=start.timestamp,
-        end_time=end.timestamp,
+        duration=duration,
+        calls=calls,
         entries=entries,
     )
 
 
-def single_request_to_call(entries: List[LogEntry]) -> Call:
-    id, = uniq_by(entries, lambda e: e.id)
-    function, = uniq_by(entries, lambda e: e.fn["name"])
+def single_request_to_call(entries: List[LogEntry], id=None, function=None) -> Call:
+    if id is None:
+        id, = uniq_by(entries, lambda e: e.id)
+    if function is None:
+        function, = uniq_by(entries, lambda e: e.fn["name"])
 
     # set routed path if CRUD call
     if all(PerfLog.is_routed_entry(e) for e in entries):
@@ -55,15 +81,25 @@ def single_request_to_call(entries: List[LogEntry]) -> Call:
         if subname != "/":
             function += subname
 
-    start = cg.get_one(entries, lambda e: e.perf_type[0] == MARK_START)
-    end = cg.get_one(entries, lambda e: e.perf_type[0] == MARK_END)
+    measure = cg.get_one(entries, lambda e: e.perf["entryType"] == "measure")
+    duration = datetime.timedelta(milliseconds=measure.perf["duration"])
+
     return Call(
         id=id,
         function=function,
-        start_time=start.timestamp,
-        end_time=end.timestamp,
+        duration=duration,
         entries=entries,
     )
+
+
+def get_rpc_out_function(entries):
+    fun, = uniq_by(entries, lambda e: e.perf_type_data.split(":")[0])
+    return fun
+
+
+def get_rpc_out_id(entries):
+    id, = uniq_by(entries, lambda e: tuple(e.perf_type_data.split(":")[1].split("-")))
+    return id
 
 
 def request_to_call(entries: List[LogEntry]) -> Call:
@@ -72,7 +108,7 @@ def request_to_call(entries: List[LogEntry]) -> Call:
     outgoing_entries = [e for e in perf_entries if PerfLog.is_outgoing_entry(e)]
     call = single_request_to_call(incoming_entries)
     call.calls = [
-        single_request_to_call(e)
+        single_request_to_call(e, get_rpc_out_id(e), get_rpc_out_function(e))
         for e in group_by(outgoing_entries, lambda e: e.perf_type_data).values()
     ]
     request_entries = [e for e in entries if isinstance(e, RequestLog)]
@@ -86,8 +122,7 @@ def misc_to_call(entries: List[LogEntry]) -> Call:
     return Call(
         id=(None, UNDEFINED_XPAIR),
         function=None,
-        start_time=None,
-        end_time=None,
+        duration=None,
         entries=entries,
     )
 
