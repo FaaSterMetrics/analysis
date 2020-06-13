@@ -13,8 +13,6 @@ import faastermetrics.graph as fg
 
 def print_walk_node(graph, node, level=0):
     print("  " * level, node, ":", f"calls: {len(graph.nodes(data=True)[node]['calls'])}")
-    # if level == 1:
-    #     print(graph.nodes(data=True)[node]["calls"][0].entries)
     for succ in graph.successors(node):
         print_walk_node(graph, succ, level+1)
 
