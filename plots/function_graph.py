@@ -240,7 +240,7 @@ def main(data: pathlib.Path, output: pathlib.Path, style: str = "classic", funct
         data: Path to json log dump.
         output: Output graph folder.
         style: Set style of output graph.
-        functions: Only show specific functions in graph.
+        functions: Only show specific functions in graph. (eg "[frontend, add]")
     """
     output = output / data.stem
     output.mkdir(parents=True, exist_ok=True)
