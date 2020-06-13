@@ -69,7 +69,6 @@ def node_platform(graph, node):
 def node_rpc_in_duration(graph, node, reduce_fun=np.mean):
     """Calculate rpcIn for the given node."""
     calls = graph.nodes[node]["calls"]
-    print(calls)
     durations = [conv_to_ms(c.duration) for c in calls if c.duration is not None]
     duration = reduce_fun(durations)
     return duration
