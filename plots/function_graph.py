@@ -16,7 +16,7 @@ import faastermetrics as fm
 from faastermetrics.graph import build_function_graph, add_default_metadata
 
 
-def classic_style(graph):
+def classic_style(graph, *_, **__):
 
     def format_graph(graph):
         def format_node_labels(graph):
@@ -126,8 +126,8 @@ def set_edge_attributes(graph, attributes):
         nx.set_edge_attributes(graph, value, key)
 
 
-def modern_style(graph):
-    graph = format_graph_modern(graph)
+def modern_style(graph, show_time):
+    graph = format_graph_modern(graph, show_time=show_time)
     colors = [
         "#2b2d42",  # bgdark
         "#8d99ae",  # dark
@@ -210,10 +210,10 @@ STYLES = {
 }
 
 
-def plot_graph(graph, plotdir, style="classic"):
+def plot_graph(graph, plotdir, style="classic", show_time=True):
     gfun, afun = STYLES[style]
 
-    graph = gfun(graph)
+    graph = gfun(graph, show_time)
 
     A = to_agraph(graph)
 
@@ -221,7 +221,7 @@ def plot_graph(graph, plotdir, style="classic"):
     A.draw(str(plotdir / f"gviz_fgraph.png"))
 
 
-def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path, style: str, functions: list):
+def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path, style: str, functions: list, show_time: bool):
     """Build the call graph from the given logging data.
     """
     graph = build_function_graph(data)
@@ -231,23 +231,29 @@ def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path, style: str, fun
     if functions:
         graph = graph.subgraph(functions)
 
-    plot_graph(graph, plotdir, style=style)
+    plot_graph(graph, plotdir, style=style, show_time=show_time)
 
 
-def main(data: pathlib.Path, output: pathlib.Path, style: str = "classic", functions: List[str] = lambda: list()):
+def main(
+        data: pathlib.Path,
+        output: pathlib.Path,
+        style: str = "classic",
+        functions: List[str] = lambda: list(),
+        notime: bool = False):
     """
     Args:
         data: Path to json log dump.
         output: Output graph folder.
         style: Set style of output graph.
         functions: Only show specific functions in graph. (eg "[frontend, add]")
+        notime: Hide rpcIn and rpcOut times.
     """
     output = output / data.stem
     output.mkdir(parents=True, exist_ok=True)
 
     data = fm.load_logs(data)
-    analyze_tree(data, output, style, functions)
+    analyze_tree(data, output, style, functions, not notime)
 
 
 if __name__ == "__main__":
-    argmagic(main, positional=("data", "output"))
+    argmagic(main, positional=("data", "output"), use_flags=True)
