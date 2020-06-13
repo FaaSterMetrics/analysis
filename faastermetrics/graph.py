@@ -52,12 +52,12 @@ def conv_to_ms(timedelta):
 
 
 def node_num_calls(graph, node):
-    calls = graph.nodes(data="calls")[node]
+    calls = graph.nodes[node]["calls"]
     return len(calls)
 
 
 def node_platform(graph, node):
-    calls = graph.nodes(data="calls")[node]
+    calls = graph.nodes[node]["calls"]
     platforms = [e.platform for c in calls for e in c.entries]
     uniq_platforms = set(platforms)
     if len(uniq_platforms) != 1:
@@ -68,14 +68,15 @@ def node_platform(graph, node):
 
 def node_rpc_in_duration(graph, node, reduce_fun=np.mean):
     """Calculate rpcIn for the given node."""
-    calls = graph.nodes(data="calls")[node]
+    calls = graph.nodes[node]["calls"]
+    print(calls)
     durations = [conv_to_ms(c.duration) for c in calls if c.duration is not None]
     duration = reduce_fun(durations)
     return duration
 
 
 def edge_rpc_out_duration(graph, edge, reduce_fun=np.mean):
-    calls = graph.edges(data="calls")[edge]
+    calls = graph.edges[edge]["calls"]
     durations = [conv_to_ms(c.duration) for c in calls if c.duration is not None]
     duration = reduce_fun(durations)
     return duration
@@ -83,8 +84,8 @@ def edge_rpc_out_duration(graph, edge, reduce_fun=np.mean):
 
 def edge_transport_duration(graph, edge, reduce_fun=np.mean):
     _, dest = edge
-    dest_calls = graph.nodes(data="calls")[dest]
-    edge_calls = graph.edges(data="calls")[edge]
+    dest_calls = graph.nodes[dest]["calls"]
+    edge_calls = graph.edges[edge]["calls"]
 
     transport_times = []
     edge_dest = [(e, d) for e in edge_calls for d in dest_calls if e.id == d.id]
@@ -96,17 +97,16 @@ def edge_transport_duration(graph, edge, reduce_fun=np.mean):
 
 
 def apply_to_graph_nodes(graph, fun, key):
-    nx.set_node_attributes(graph, {n: fun(n) for n in graph.nodes}, key)
+    nx.set_node_attributes(graph, {n: fun(graph, n) for n in graph.nodes}, key)
     return graph
 
 
 def apply_to_graph_edges(graph, fun, key):
-    nx.set_edge_attributes(graph, {e: fun(e) for e in graph.edges}, key)
+    nx.set_edge_attributes(graph, {e: fun(graph, e) for e in graph.edges}, key)
     return graph
 
 
 def add_default_metadata(graph):
-    apply_to_graph_nodes(graph, node_num_calls, "calls")
     apply_to_graph_nodes(graph, node_rpc_in_duration, "rpc_in")
     apply_to_graph_nodes(graph, node_platform, "platform")
 
