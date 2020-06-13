@@ -25,6 +25,7 @@ setuptools.setup(
     install_requires=[
         "json_coder==0.5",
         "argmagic==1.0.0",
+        "networkx",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
