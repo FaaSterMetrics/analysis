@@ -167,6 +167,7 @@ def modern_style(graph, show_time):
 
     if graph.has_node("artillery"):
         graph.nodes["artillery"]["fillcolor"] = colors[3]
+        graph.nodes["artillery"]["label"] = "artillery"  # do not include any weird time label in artillery
 
     return graph
 
