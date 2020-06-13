@@ -8,35 +8,24 @@ from collections import defaultdict, Counter
 
 from argmagic import argmagic
 import faastermetrics as fm
-import faastermetrics.helper as fh
-import faastermetrics.calls as fr
+import faastermetrics.graph as fg
 
 
-def print_request_tree(entries: List[fm.LogEntry]):
-    """Print requests based on their xpairs and context ids."""
-    group_data = fh.group_by(entries, lambda e: e.id)
-    fh.print_group(group_data)
-
-    rgs = fr.create_requestgroups(entries)
-    for call in rgs:
-        print(call)
+def print_walk_node(graph, node, level=0):
+    print("  " * level, node, ":", f"calls: {len(graph.nodes(data=True)[node]['calls'])}")
+    # if level == 1:
+    #     print(graph.nodes(data=True)[node]["calls"][0].entries)
+    for succ in graph.successors(node):
+        print_walk_node(graph, succ, level+1)
 
 
 def print_function_tree(entries: List[fm.LogEntry]):
-    # group entries by function
-    by_fn = defaultdict(list)
-    for entry in entries:
-        if "event" not in entry.data:
-            continue
-        by_fn[entry.fn["name"]].append(entry)
-
-    for name, fn_entries in by_fn.items():
-        subtypes = Counter([type(e) for e in fn_entries])
-        print(f"{name}: {len(fn_entries)} entries : {subtypes}")
-        if name == "undefined":
-            continue
-        # for entry in fn_entries:
-        #     pprint(entry.data)
+    """Print requests based on their xpairs and context ids."""
+    graph = fg.build_function_graph(entries)
+    for node, deg in graph.in_degree:
+        if deg == 0:
+            print("Calltree induced on:", node)
+            print_walk_node(graph, node)
 
 
 def main(logdump: pathlib.Path):
@@ -49,8 +38,7 @@ def main(logdump: pathlib.Path):
     data = fm.load_logs(logdump)
 
     print_function_tree(data)
-
-    print_request_tree(data)
+    # print_request_tree(data)
 
 
 if __name__ == "__main__":
