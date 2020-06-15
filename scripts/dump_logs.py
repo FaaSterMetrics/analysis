@@ -24,7 +24,12 @@ def parse_timewindow(timewindow: str) -> datetime.timedelta:
     return datetime.timedelta(**tdelta_args)
 
 
-def dump_logs(logdir: pathlib.Path, outdir: pathlib.Path, version: str = None, timewindow: str = None):
+def dump_logs(
+        logdir: pathlib.Path,
+        outdir: pathlib.Path,
+        version: str = None,
+        timewindow: str = None,
+):
     """Output logs to the given destination directory.
 
     Args:
@@ -50,6 +55,16 @@ def dump_logs(logdir: pathlib.Path, outdir: pathlib.Path, version: str = None, t
         print(f"Filtering timewindow of {timewindow}: {start_time} {end_time}")
         num_before = len(log_entries)
         log_entries = [e for e in log_entries if e.timestamp >= start_time]
+        num_after = len(log_entries)
+        print(f"  Kept {num_after}/{num_before} ({num_before - num_after} removed)")
+
+    deploy_path = logdir / "deployment_id.txt"
+    if deploy_path.exists():
+        with open(deploy_path) as dfile:
+            deploy_id = dfile.read().strip()
+        print(f"Filtering on deploy ID: {deploy_id}")
+        num_before = len(log_entries)
+        log_entries = [e for e in log_entries if e.data["deploymentId"] == deploy_id]
         num_after = len(log_entries)
         print(f"  Kept {num_after}/{num_before} ({num_before - num_after} removed)")
 

@@ -41,7 +41,7 @@ def parse_logdir(path: pathlib.Path) -> List[LogEntry]:
         raise ValueError(f"{path} is not a valid log directory.")
     entries = [
         entry
-        for filepath in path.iterdir() for entry in parse_logfile(filepath, platform=filepath.stem)
+        for filepath in path.glob("*.log") for entry in parse_logfile(filepath, platform=filepath.stem)
     ]
     return entries
 
