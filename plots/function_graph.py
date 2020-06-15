@@ -142,7 +142,8 @@ def modern_style(graph, show_time):
         "fontsize": "18",
         "height": "1",
         "width": "3",
-        "style": "setlinewidth(10), filled",
+        "style": "filled",
+        "penwidth": "10",
         "color": "#ffffff",
         "fillcolor": colors[0],
         "fontcolor": colors[2],
@@ -151,7 +152,7 @@ def modern_style(graph, show_time):
     # edge formatting
     set_edge_attributes(graph, {
         "style": "dashed",
-        "penwidth": "4",
+        "penwidth": 4,
         "arrowhead": "normal",
         "arrowsize": "1",
         "color": colors[1],
@@ -160,13 +161,17 @@ def modern_style(graph, show_time):
         "fontcolor": colors[1],
     })
     graph.graph["overlap"] = "scale"
-    # graph.graph["splines"] = "true"
     graph.graph["esep"] = 3
+    graph.graph["dpi"] = 300
     graph.graph["nodesep"] = 1
     graph.graph["ranksep"] = 1.1
 
     if graph.has_node("artillery"):
-        graph.nodes["artillery"]["fillcolor"] = colors[3]
+        graph.nodes["artillery"]["fillcolor"] = colors[1]
+        graph.nodes["artillery"]["style"] = "filled"
+        graph.nodes["artillery"]["fontcolor"] = colors[2]
+        graph.nodes["artillery"]["penwidth"] = 10
+        graph.nodes["artillery"]["height"] = 0.75
         graph.nodes["artillery"]["label"] = "artillery"  # do not include any weird time label in artillery
 
     return graph
@@ -219,10 +224,10 @@ def plot_graph(graph, plotdir, style="classic", show_time=True):
     A = to_agraph(graph)
 
     A = afun(A, graph)
-    A.draw(str(plotdir / f"gviz_fgraph.png"))
+    A.draw(str(plotdir / "gviz_fgraph.png"), format="png")
 
 
-def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path, style: str, functions: list, show_time: bool):
+def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path, style: str, functions: List[str], show_time: bool):
     """Build the call graph from the given logging data.
     """
     graph = build_function_graph(data)
