@@ -12,7 +12,12 @@ import faastermetrics.graph as fg
 
 
 def print_walk_node(graph, node, level=0):
-    print("  " * level, node, ":", f"calls: {len(graph.nodes(data=True)[node]['calls'])}")
+    calls = graph.nodes[node]["calls"]
+    indent = "  " * level
+    add_info = ""
+    if level == 0:
+        add_info += str({c.id[0] for c in calls})
+    print(f"{indent}{node}: calls: {len(calls)} : {add_info}")
     for succ in graph.successors(node):
         print_walk_node(graph, succ, level+1)
 
@@ -22,7 +27,7 @@ def print_function_tree(entries: List[fm.LogEntry]):
     graph = fg.build_function_graph(entries)
     for node, deg in graph.in_degree:
         if deg == 0:
-            print("Calltree induced on:", node)
+            print(f"= Calltree induced on: {node} =")
             print_walk_node(graph, node)
 
 
