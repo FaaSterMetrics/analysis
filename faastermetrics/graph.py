@@ -1,12 +1,38 @@
 """
 Generate a request graph based on a list of log entries.
 """
+from collections import Counter
+
 import numpy as np
 
 import networkx as nx
 from .logentry import LogEntry
 from .calls import create_requestgroups
 from .helper import uniq_by
+
+
+def build_call_graph(entries: LogEntry) -> nx.DiGraph:
+    calls = create_requestgroups(entries)
+
+    len_all_calls = len(calls)
+    calls = [c for c in calls if c.id[0] is not None]
+    print(f"Keep with context ids only: {len(calls)}/{len_all_calls}")
+
+    count_ids = Counter([c.id for c in calls])
+    if max(count_ids.values()) > 1:
+        raise ValueError(f"Duplicate ids: {count_ids - 1}")
+
+    graph = nx.DiGraph()
+
+    for call in calls:
+        graph.add_node(call.id, calls=[call])
+        # add edges
+        for subcall in call.calls:
+            matched_call, = [c for c in calls if c.id == subcall.id]
+            graph.add_node(matched_call.id, calls=[matched_call])
+            graph.add_edge(call.id, subcall.id, calls=[subcall])
+
+    return graph
 
 
 def build_function_graph(entries: LogEntry) -> nx.DiGraph:
