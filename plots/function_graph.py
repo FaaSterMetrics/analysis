@@ -13,107 +13,112 @@ import networkx as nx
 from networkx.drawing.nx_agraph import to_agraph
 
 import faastermetrics as fm
-from faastermetrics.graph import build_function_graph, add_default_metadata
+from faastermetrics.helper import group_by, uniq_by
+from faastermetrics.logentry import UNDEFINED_XPAIR
+from faastermetrics.graph import build_function_graph, add_default_metadata, build_call_graph
 
 
-def classic_style(graph, *_, **__):
+STYLE_CLASSIC = {
+    "node_style": {
+    },
+    "edge_style": {
+    },
+    "caller_style": {
+        "height": 0.2,
+        "width": 0.2,
+    },
+    "node_label_table": {
+        "cellpadding": 2, "border": 0, "cellborder": 0
+    },
+    "node_label_table_font_small": {
+        "point-size": 10,
+    },
+    "edge_label_table": {
+        "cellpadding": 5, "border": 0, "cellborder": 0
+    },
+    "cluster_style": {
+    },
+    "graph": {
+        "rankdir": "LR",
+    },
+    "layout": "dot",
+}
 
-    def format_graph(graph):
-        def format_node_labels(graph):
-            labels = {}
-            for fname, fdata in graph.nodes(data=True):
-                fcalls = len(fdata["calls"])
-                fduration = fdata["rpc_in"]
-                if fduration is None:
-                    label = f"{fname}\n({fcalls} calls)"
-                else:
-                    label = f"{fname}\n({fcalls} calls, {fduration:.2f}ms)"
-                labels[fname] = label
+MODERN_COLORS = [
+    "#2b2d42",  # bgdark
+    "#8d99ae",  # dark
+    "#edf2f4",  # bright
+    "#ef233c",  # hlcolor
+    "#d90429",  # hlcolor2
+]
 
-            return labels
-
-        def format_edge_labels(graph):
-            labels = {}
-            for (*edge, edata) in graph.edges(data=True):
-                e_outer = edata.get("rpc_out", None)
-                e_trans = edata.get("transport", None)
-
-                labels[tuple(edge)] = f"Total: {e_outer:.2f}ms\nTransport: {e_trans:.2f}ms"
-
-            return labels
-
-        nx.set_node_attributes(graph, format_node_labels(graph), "label")
-        nx.set_edge_attributes(graph, format_edge_labels(graph), "label")
-        return graph
-
-    graph = format_graph(graph)
-
-    # add request nodes
-    for node in list(graph.nodes.keys()):
-        if len(graph.out_edges(node)) > 0 and len(graph.in_edges(node)) == 0:
-            graph.add_node("__req_origin__", label="", height=0.2, width=0.2)
-            graph.add_edge("__req_origin__", node)
-    return graph
-
-
-def classic_style_agraph(A, graph, cluster_key="platform"):
-    A.graph_attr.update(rankdir="LR")
-
-    node_vals = nx.get_node_attributes(graph, cluster_key)
-    val_nodes = defaultdict(list)
-    for node, value in node_vals.items():
-        val_nodes[value].append(node)
-
-    # create subgraphs
-    for value, nodes in val_nodes.items():
-        subgraph_name = f"cluster_{value}"
-        A.add_subgraph(nodes, name=subgraph_name, label=value)
-
-    A.layout("dot")
-    return A
-
-
-def format_node_color(graph):
-    platform = nx.get_node_attributes(graph, "platform")
-
-    platform_colors = {
-        "aws": "#eb7720",
-        "google": "#e34335",
-        "azure": "#0090C2",
-    }
-
-    node_fillcolor = {}
-    for node in graph.nodes:
-        node_fillcolor[node] = platform_colors[platform[node]]
-
-    return node_fillcolor
+STYLE_MODERN = {
+    "node_style": {
+        "shape": "box",
+        "fontname": "Futura Bold",
+        "fontsize": "18",
+        "height": "1",
+        "width": "3",
+        "style": "filled",
+        "penwidth": "10",
+        "color": "#ffffff",
+        "fillcolor": MODERN_COLORS[0],
+        "fontcolor": MODERN_COLORS[2],
+    },
+    "edge_style": {
+        "style": "dashed",
+        "penwidth": 4,
+        "arrowhead": "normal",
+        "arrowsize": "1",
+        "color": MODERN_COLORS[1],
+        "fontname": "Futura",
+        "fontsize": "14",
+        "fontcolor": MODERN_COLORS[1],
+    },
+    "caller_style": {
+        "fillcolor": MODERN_COLORS[1],
+        "style": "filled",
+        "fontcolor": MODERN_COLORS[2],
+        "penwidth": 10,
+        "height": 1,
+    },
+    "node_label_table": {
+        "cellpadding": 2, "border": 0, "cellborder": 0
+    },
+    "node_label_table_font_small": {
+        "point-size": 10,
+    },
+    "edge_label_table": {
+        "cellpadding": 5, "border": 0, "cellborder": 0
+    },
+    "cluster_style": {
+        "labelloc": "b",
+        "fontname": "Futura Bold",
+        "fontsize": "12",
+        "fontcolor": MODERN_COLORS[0],
+        "fillcolor": MODERN_COLORS[2],
+        "style": "filled",
+        "penwidth": 1,
+        "color": MODERN_COLORS[0],
+    },
+    "graph": {
+        "overlap": "scale",
+        "dpi": 300,
+        "nodesep": 1,
+        "ranksep": 1.1,
+    },
+    "layout": "dot",
+}
 
 
-def format_graph_modern(graph, show_time=True):
-    def format_node_label(node, data):
-        if show_time:
-            return f'<<table cellpadding="2" border="0" cellborder="0"><tr><td>{node}</td></tr><tr><td><FONT point-size="10">{data["rpc_in"]:.2f}ms</FONT></td></tr></table>>'
-        else:
-            return node
+def set_single_node_attributes(graph, node, attributes):
+    for key, item in attributes.items():
+        graph.nodes[node][key] = item
 
-    node_labels = {
-        n: format_node_label(n, data)
-        for n, data in graph.nodes(data=True)
-    }
-    nx.set_node_attributes(graph, node_labels, "label")
 
-    def pad_edge_label(label):
-        if show_time:
-            return f'<<table cellpadding="5" border="0" cellborder="0"><tr><td>{label}</td></tr></table>>'
-        else:
-            return ""
-
-    edge_labels = {
-        (a, b): pad_edge_label(f"{data['rpc_out']:.2f}ms")
-        for (a, b, data) in graph.edges(data=True)
-    }
-    nx.set_edge_attributes(graph, edge_labels, "label")
-    return graph
+def set_single_edge_attributes(graph, edge, attributes):
+    for key, item in attributes.items():
+        graph.edges[edge][key] = item
 
 
 def set_node_attributes(graph, attributes):
@@ -126,124 +131,229 @@ def set_edge_attributes(graph, attributes):
         nx.set_edge_attributes(graph, value, key)
 
 
-def modern_style(graph, show_time):
-    graph = format_graph_modern(graph, show_time=show_time)
-    colors = [
-        "#2b2d42",  # bgdark
-        "#8d99ae",  # dark
-        "#edf2f4",  # bright
-        "#ef233c",  # hlcolor
-        "#d90429",  # hlcolor2
-    ]
-    # node formatting
-    set_node_attributes(graph, {
-        "shape": "box",
-        "fontname": "Futura Bold",
-        "fontsize": "18",
-        "height": "1",
-        "width": "3",
-        "style": "filled",
-        "penwidth": "10",
-        "color": "#ffffff",
-        "fillcolor": colors[0],
-        "fontcolor": colors[2],
-    })
+def get_caller_nodes(graph):
+    callers = [n for n in graph.nodes if graph.nodes[n].get("iscaller", False)]
+    return callers
 
-    # edge formatting
-    set_edge_attributes(graph, {
-        "style": "dashed",
-        "penwidth": 4,
-        "arrowhead": "normal",
-        "arrowsize": "1",
-        "color": colors[1],
-        "fontname": "Futura",
-        "fontsize": "14",
-        "fontcolor": colors[1],
-    })
-    graph.graph["overlap"] = "scale"
-    graph.graph["esep"] = 3
-    graph.graph["dpi"] = 300
-    graph.graph["nodesep"] = 1
-    graph.graph["ranksep"] = 1.1
 
-    if graph.has_node("artillery"):
-        graph.nodes["artillery"]["fillcolor"] = colors[1]
-        graph.nodes["artillery"]["style"] = "filled"
-        graph.nodes["artillery"]["fontcolor"] = colors[2]
-        graph.nodes["artillery"]["penwidth"] = 10
-        graph.nodes["artillery"]["height"] = 0.75
-        graph.nodes["artillery"]["label"] = "artillery"  # do not include any weird time label in artillery
+def get_node_function(graph, node):
+    calls = graph.nodes[node]["calls"]
+    function, = uniq_by(calls, lambda c: c.function)
+    return function
 
+
+def get_node_xpairs(graph, node):
+    xpairs = {c.id[1] for c in graph.nodes[node].get("calls", [])}
+    return xpairs
+
+
+def format_attrs(attributes):
+    attrs = " ".join(f'{k}="{v}"' for k, v in attributes.items())
+    return attrs
+
+
+def html_font(data, attributes):
+    return f"<font {format_attrs(attributes)}>{data}</font>"
+
+
+def html_table(rowcol_data, attributes):
+    def destruct_item(item):
+        if isinstance(item, tuple):
+            d, attrs = item
+        else:
+            d, attrs = item, {}
+        return d, attrs
+
+    rows = ["".join(f"<td {format_attrs(d)}>{c}</td>" for c, d in [destruct_item(d) for d in r]) for r in rowcol_data]
+    table_str = "".join(f"<tr>{row_str}</tr>" for row_str in rows)
+    return f"<table {format_attrs(attributes)}>{table_str}</table>"
+
+
+def format_graph(graph, filters, style):
+    show_time = filters["show_time"]
+    context_id = bool(filters["context_id"])
+
+    def format_node_label(node, data):
+        main_data = node
+        sub_datas = []
+
+        if context_id:
+            # main_data = data["calls"][0].function
+            # if node[1] != UNDEFINED_XPAIR:
+            #     sub_datas += [f"{node[1]}"]
+            main_data = node[1]
+
+        if show_time:
+            sub_datas += [f"{data['rpc_in']:.2f}ms"]
+
+        if len(sub_datas) > 0:
+            sub_datas = list(map(lambda s: html_font(s, style["node_label_table_font_small"]), sub_datas))
+            sub_data = "".join(f"<td>{s}</td>" for s in sub_datas)
+            label_str = html_table(
+                [[(main_data, {"colspan": len(sub_datas)})], sub_datas],
+                style["node_label_table"],
+            )
+            return f'<{label_str}>'
+        else:
+            return main_data
+
+    node_labels = {
+        n: format_node_label(n, data)
+        for n, data in graph.nodes(data=True)
+    }
+    nx.set_node_attributes(graph, node_labels, "label")
+
+    def format_edge_label(data):
+        labels = []
+        if context_id:
+            labels += [f"{data['calls'][0].id[1]}"]
+        if show_time:
+            labels += [f"{data['rpc_out']:.2f}ms"]
+
+        # show no edge label until we figure out rpcOut issues: https://github.com/FaaSterMetrics/analysis/issues/24
+        if context_id:
+            return ""
+
+        if len(labels) > 0:
+            label = html_table([[l] for l in labels], style["edge_label_table"])
+            return f'<{label}>'
+        else:
+            return ""
+
+    edge_labels = {
+        (a, b): format_edge_label(data)
+        for (a, b, data) in graph.edges(data=True)
+    }
+    nx.set_edge_attributes(graph, edge_labels, "label")
     return graph
 
 
-def modern_style_agraph(A, graph):
-    colors = [
-        "#2b2d42",
-        "#8d99ae",
-        "#edf2f4",
-        "#ef233c",
-        "#d90429",
-    ]
+def apply_graph_style(graph, filters, style):
+    graph = format_graph(graph, filters, style)
+
+    if graph.has_node("artillery"):
+        graph.nodes["artillery"]["iscaller"] = True
+    else:
+        graph.add_node("__caller__", iscaller=True)
+        # connect node to nodes without xpair
+        for node in graph:
+            if UNDEFINED_XPAIR in get_node_xpairs(graph, node):
+                graph.add_edge("__caller__", node, calls=[])
+
+    # node formatting
+    set_node_attributes(graph, style["node_style"])
+
+    # edge formatting
+    set_edge_attributes(graph, style["edge_style"])
+    for key, item in style["graph"].items():
+        graph.graph[key] = item
+
+    for caller in get_caller_nodes(graph):
+        set_single_node_attributes(graph, caller, style["caller_style"])
+
+        # graph.nodes["artillery"]["label"] = "artillery"  # do not include any weird time label in artillery
+        caller_name = caller if caller != "__caller__" else "External Caller"
+        if not filters["context_id"]:
+            graph.nodes[caller]["label"] = caller_name
+        else:
+            graph.nodes[caller]["label"] = "<" + html_table(
+                [[f'Context ID {filters["context_id"]}'], [html_font(caller_name, style["node_label_table_font_small"])]],
+                style["node_label_table"]
+            ) + ">"
+    return graph
+
+
+def apply_agraph_style(A, graph, filters, style):
+    cluster_style = style["cluster_style"]
 
     node_vals = nx.get_node_attributes(graph, "platform")
     val_nodes = defaultdict(list)
     for node, value in node_vals.items():
-        if value != "artillery":
+        if value not in ("artillery", "__caller__"):
             val_nodes[value].append(node)
 
     # create subgraphs
     for value, nodes in val_nodes.items():
         subgraph_name = f"cluster_{value}"
-        A.add_subgraph(
-            nodes, name=subgraph_name, label=value,
-            labelloc="b", fontname="Futura Bold", fontsize="12",
-            fontcolor=colors[0],
-            fillcolor=colors[2], style="filled", penwidth=1, color=colors[0],
-        )
+        platgroup = A.add_subgraph(nodes, name=subgraph_name, label=value, **cluster_style)
+
         # set border color for included nodes
         for node in nodes:
-            A.get_node(node).attr["color"] = colors[2]
+            A.get_node(node).attr["color"] = cluster_style.get("fillcolor", "")
 
-    A.layout("dot")
+        # create nested subgraph on function if call graph
+        if filters["context_id"]:
+            for name, fnodes in group_by(nodes, lambda e: get_node_function(graph, e)).items():
+                platgroup.add_subgraph(
+                    fnodes, name=f"cluster_{name}", label=name,
+                    **cluster_style
+                )
+
+    A.layout(style["layout"])
 
     return A
 
 
 STYLES = {
-    "classic": (classic_style, classic_style_agraph),
-    "modern": (modern_style, modern_style_agraph),
+    "classic": STYLE_CLASSIC,
+    "modern": STYLE_MODERN,
 }
 
 
-def plot_graph(graph, plotdir, style="classic", show_time=True):
-    gfun, afun = STYLES[style]
+def plot_graph(graph, plotdir, filters, style="classic"):
+    style = STYLES[style]
 
-    graph = gfun(graph, show_time)
+    graph = apply_graph_style(graph, filters, style)
 
     A = to_agraph(graph)
 
-    A = afun(A, graph)
+    A = apply_agraph_style(A, graph, filters, style)
     A.draw(str(plotdir / "gviz_fgraph.png"), format="png")
 
 
-def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path, style: str, functions: List[str], show_time: bool):
+def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path, style: str, filters: dict):
     """Build the call graph from the given logging data.
     """
-    graph = build_function_graph(data)
+    context_id = filters["context_id"]
+    if context_id:
+        len_before = len(data)
+        data = [d for d in data if d.context_id == context_id]
+        print(f"Filter on contextId({context_id}): {len_before}/{len(data)} included")
+        graph = build_call_graph(data)
+    else:
+        graph = build_function_graph(data)
+
     graph = add_default_metadata(graph)
 
-    # generate subgraph based on given functions
+    tree_root = filters["function_tree"]
+    if tree_root:
+        succs = list(nx.dfs_preorder_nodes(graph, tree_root))
+        preds = list(nx.dfs_preorder_nodes(graph.reverse(), tree_root))
+        included = succs + preds
+        graph = graph.subgraph(included)
+        print(f"Only include nodes with connection to {tree_root}: {set(included)}")
+
+    min_degree = filters["min_degree"]
+    if min_degree:
+        print(f"Removing nodes with degree lower equal {min_degree}")
+        graph = graph.subgraph([n for n, d in graph.degree if d > min_degree])
+
+    functions = filters["functions_only"]
     if functions:
+        print(f"Only show: {functions}")
         graph = graph.subgraph(functions)
 
-    plot_graph(graph, plotdir, style=style, show_time=show_time)
+    plot_graph(graph, plotdir, filters, style=style)
 
 
 def main(
         data: pathlib.Path,
         output: pathlib.Path,
         style: str = "classic",
+        ftree: str = None,
+        context: str = None,
+        degree: int = 0,
+        xpair: bool = False,
         functions: List[str] = lambda: list(),
         notime: bool = False):
     """
@@ -252,13 +362,25 @@ def main(
         output: Output graph folder.
         style: Set style of output graph.
         functions: Only show specific functions in graph. (eg "[frontend, add]")
+        degree: Minimal node degree filter.
+        context: Filter on context id.
+        ftree: Only show functions that are connected with the given function.
         notime: Hide rpcIn and rpcOut times.
+        xpair: Show separate xpairs in individual nodes.
     """
     output = output / data.stem
     output.mkdir(parents=True, exist_ok=True)
 
     data = fm.load_logs(data)
-    analyze_tree(data, output, style, functions, not notime)
+    graph_filters = {
+        "function_tree": ftree,
+        "functions_only": functions,
+        "context_id": context,
+        "min_degree": degree,
+        "xpair": xpair,
+        "show_time": not notime,
+    }
+    analyze_tree(data, output, style, graph_filters)
 
 
 if __name__ == "__main__":
