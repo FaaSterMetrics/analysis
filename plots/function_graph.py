@@ -136,8 +136,11 @@ def get_caller_nodes(graph):
     return callers
 
 
+def is_artillery(graph, node):
+    return all(c.function == "artillery" for c in graph.nodes[node]["calls"])
+
 def get_artillery_nodes(graph):
-    artillery_nodes = [n for n in graph.nodes if all(c.function == "artillery" for c in graph.nodes[n]["calls"])]
+    artillery_nodes = [n for n in graph.nodes if is_artillery(graph, n)]
     return artillery_nodes
 
 
@@ -205,15 +208,15 @@ def format_graph(graph, filters, style):
     }
     nx.set_node_attributes(graph, node_labels, "label")
 
-    def format_edge_label(data):
+    def format_edge_label(edge, data):
         labels = []
-        if context_id:
-            labels += [f"{data['calls'][0].id[1]}"]
+        # if context_id:
+        #     labels += [f"{data['calls'][0].id[1]}"]
         if show_time:
             labels += [f"{data['rpc_out']:.2f}ms"]
 
         # show no edge label until we figure out rpcOut issues: https://github.com/FaaSterMetrics/analysis/issues/24
-        if context_id:
+        if context_id and not is_artillery(graph, edge[0]):
             return ""
 
         if len(labels) > 0:
@@ -223,7 +226,7 @@ def format_graph(graph, filters, style):
             return ""
 
     edge_labels = {
-        (a, b): format_edge_label(data)
+        (a, b): format_edge_label((a, b), data)
         for (a, b, data) in graph.edges(data=True)
     }
     nx.set_edge_attributes(graph, edge_labels, "label")
