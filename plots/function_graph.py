@@ -210,13 +210,13 @@ def format_graph(graph, filters, style):
 
     def format_edge_label(edge, data):
         labels = []
-        # if context_id:
-        #     labels += [f"{data['calls'][0].id[1]}"]
+        if context_id:
+            labels += [f"{data['calls'][0].id[1]}"]
         if show_time:
             labels += [f"{data['rpc_out']:.2f}ms"]
 
         # show no edge label until we figure out rpcOut issues: https://github.com/FaaSterMetrics/analysis/issues/24
-        if context_id and not is_artillery(graph, edge[0]):
+        if context_id:
             return ""
 
         if len(labels) > 0:
@@ -269,10 +269,13 @@ def apply_graph_style(graph, filters, style):
         # graph.nodes["artillery"]["label"] = "artillery"  # do not include any weird time label in artillery
         caller_name = CALLER_NAMES.get(graph.nodes[caller]["calltype"], "Unknown caller")
         if filters["context_id"]:
-            graph.nodes[caller]["label"] = "<" + html_table(
-                [[f'Context ID {filters["context_id"]}'], [html_font(caller_name, style["node_label_table_font_small"])]],
-                style["node_label_table"]
-            ) + ">"
+            table_data = [
+                [f'Context ID {filters["context_id"]}'],
+                [html_font(caller_name, style["node_label_table_font_small"])],
+            ]
+            if graph.nodes[caller]["calltype"] == "__artillery__":
+                table_data.append([html_font(f"{graph.nodes[caller]['rpc_in']:.2f}ms", style["node_label_table_font_small"])])
+            graph.nodes[caller]["label"] = "<" + html_table(table_data, style["node_label_table"]) + ">"
         else:
             graph.nodes[caller]["label"] = caller_name
     return graph
