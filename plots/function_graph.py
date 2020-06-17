@@ -136,6 +136,11 @@ def get_caller_nodes(graph):
     return callers
 
 
+def get_artillery_nodes(graph):
+    artillery_nodes = [n for n in graph.nodes if all(c.function == "artillery" for c in graph.nodes[n]["calls"])]
+    return artillery_nodes
+
+
 def get_node_function(graph, node):
     calls = graph.nodes[node]["calls"]
     function, = uniq_by(calls, lambda c: c.function)
@@ -178,9 +183,6 @@ def format_graph(graph, filters, style):
         sub_datas = []
 
         if context_id:
-            # main_data = data["calls"][0].function
-            # if node[1] != UNDEFINED_XPAIR:
-            #     sub_datas += [f"{node[1]}"]
             main_data = node[1]
 
         if show_time:
@@ -228,13 +230,23 @@ def format_graph(graph, filters, style):
     return graph
 
 
+CALLER_NAMES = {
+    "__caller__": "External Caller",
+    "__artillery__": "Artillery Call",
+}
+
+
 def apply_graph_style(graph, filters, style):
     graph = format_graph(graph, filters, style)
 
-    if graph.has_node("artillery"):
-        graph.nodes["artillery"]["iscaller"] = True
+    artillery_nodes = get_artillery_nodes(graph)
+    if len(artillery_nodes) > 0:
+        for node in artillery_nodes:
+            graph.nodes[node]["iscaller"] = True
+            graph.nodes[node]["calltype"] = "__artillery__"
     else:
-        graph.add_node("__caller__", iscaller=True)
+        graph.add_node("__caller__", iscaller=True, calltype="__caller__")
+
         # connect node to nodes without xpair
         for node in graph:
             if UNDEFINED_XPAIR in get_node_xpairs(graph, node):
@@ -252,14 +264,14 @@ def apply_graph_style(graph, filters, style):
         set_single_node_attributes(graph, caller, style["caller_style"])
 
         # graph.nodes["artillery"]["label"] = "artillery"  # do not include any weird time label in artillery
-        caller_name = caller if caller != "__caller__" else "External Caller"
-        if not filters["context_id"]:
-            graph.nodes[caller]["label"] = caller_name
-        else:
+        caller_name = CALLER_NAMES.get(graph.nodes[caller]["calltype"], "Unknown caller")
+        if filters["context_id"]:
             graph.nodes[caller]["label"] = "<" + html_table(
                 [[f'Context ID {filters["context_id"]}'], [html_font(caller_name, style["node_label_table_font_small"])]],
                 style["node_label_table"]
             ) + ">"
+        else:
+            graph.nodes[caller]["label"] = caller_name
     return graph
 
 
@@ -318,7 +330,7 @@ def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path, style: str, fil
     if context_id:
         len_before = len(data)
         data = [d for d in data if d.context_id == context_id]
-        print(f"Filter on contextId({context_id}): {len_before}/{len(data)} included")
+        print(f"Filter on contextId({context_id}): {len(data)}/{len_before} included")
         graph = build_call_graph(data)
     else:
         graph = build_function_graph(data)

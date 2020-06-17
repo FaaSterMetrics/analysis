@@ -20,7 +20,7 @@ def build_call_graph(entries: LogEntry) -> nx.DiGraph:
 
     count_ids = Counter([c.id for c in calls])
     if max(count_ids.values()) > 1:
-        raise ValueError(f"Duplicate ids: {count_ids - 1}")
+        raise ValueError(f"Duplicate ids: { {k: v for k, v in count_ids.items() if v > 1} }")
 
     graph = nx.DiGraph()
 

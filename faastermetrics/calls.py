@@ -61,7 +61,7 @@ def artillery_to_call(entries: List[LogEntry]) -> Call:
         Call(id=id, function=function, entries=[], duration=duration)
     ]
     return Call(
-        id=id,
+        id=(id[0], UNDEFINED_XPAIR),
         function="artillery",
         duration=duration,
         calls=calls,
