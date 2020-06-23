@@ -64,7 +64,7 @@ def dump_logs(
             deploy_id = dfile.read().strip()
         print(f"Filtering on deploy ID: {deploy_id}")
         num_before = len(log_entries)
-        log_entries = [e for e in log_entries if e.data["deploymentId"] == deploy_id]
+        log_entries = [e for e in log_entries if e.data.get("deploymentId", "") == deploy_id]
         num_after = len(log_entries)
         print(f"  Kept {num_after}/{num_before} ({num_before - num_after} removed)")
 
