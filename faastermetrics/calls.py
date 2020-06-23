@@ -57,6 +57,11 @@ def artillery_to_call(entries: List[LogEntry]) -> Call:
     else:
         function = url.split("/", 3)[-1]
 
+    # FIXME: fix until we have a better idea how to properly fix artillery call
+    # function name
+    if "frontend" in function:
+        function = function.split("/")[0]
+
     calls = [
         Call(id=id, function=function, entries=[], duration=duration)
     ]
@@ -127,20 +132,24 @@ def misc_to_call(entries: List[LogEntry]) -> Call:
     )
 
 
-def id_groups_to_call(entries: List[LogEntry]) -> Call:
-    (context_id, _), = uniq_by(entries, lambda e: e.id)
+def id_groups_to_call(entry_id, function, entries: List[LogEntry]) -> Call:
+    (context_id, _) = entry_id
     if context_id is None:
         return misc_to_call(entries)
 
-    function, = uniq_by(entries, lambda e: e.fn["name"])
     if function == "artillery":
         return artillery_to_call(entries)
 
-    if any(isinstance(e, RequestLog) for e in entries):
+    try:
         return request_to_call(entries)
+    except ValueError as err:
+        print(f"Ignoring {function}{entry_id} with {len(entries)} entries: {err}")
 
 
 def create_requestgroups(data: List[LogEntry]) -> List[Call]:
     """Create a list of logs based on request behavior."""
     context_id_groups = group_by(data, lambda e: (e.id, e.function))
-    return [id_groups_to_call(entries) for _, entries in context_id_groups.items()]
+    return [c for c in [
+        id_groups_to_call(id, function, entries)
+        for (id, function), entries in context_id_groups.items()
+    ] if c is not None]
