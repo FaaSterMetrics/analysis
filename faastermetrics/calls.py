@@ -19,16 +19,16 @@ class Call:
     calls: List["Call"] = field(default_factory=lambda: list())
 
     @property
-    def start_time(self):
+    def start_time(self) -> datetime.datetime:
         if len(self.entries) == 0:
             return None
-        return sorted(self.entries, key=lambda e: e.timestamp)[0]
+        return sorted(self.entries, key=lambda e: e.timestamp)[0].timestamp
 
     @property
-    def end_time(self):
+    def end_time(self) -> datetime.datetime:
         if len(self.entries) == 0:
             return None
-        return sorted(self.entries, key=lambda e: e.timestamp)[-1]
+        return sorted(self.entries, key=lambda e: e.timestamp)[-1].timestamp
 
     @property
     def log_duration(self):
