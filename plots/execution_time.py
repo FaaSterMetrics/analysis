@@ -120,7 +120,7 @@ def plot_function_execution_time(data, plot_dir):
 
 
 def main(input_data: pathlib.Path, plot_dir: pathlib.Path):
-    plot_dir = plot_dir / input_data.stem
+    # plot_dir = plot_dir / input_data.stem
     plot_dir.mkdir(exist_ok=True, parents=True)
 
     data = fm.load_logs(input_data)

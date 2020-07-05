@@ -326,7 +326,11 @@ def plot_graph(graph, plotdir, filters, style="classic"):
     A = to_agraph(graph)
 
     A = apply_agraph_style(A, graph, filters, style)
-    A.draw(str(plotdir / "gviz_fgraph.png"), format="png")
+
+    if plotdir.suffix != ".png":
+        plotdir = plotdir / "gviz_fgraph.png"
+
+    A.draw(str(plotdir), format="png")
 
 
 def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path, style: str, filters: dict):
@@ -386,8 +390,9 @@ def main(
         notime: Hide rpcIn and rpcOut times.
         xpair: Show separate xpairs in individual nodes.
     """
-    output = output / data.stem
-    output.mkdir(parents=True, exist_ok=True)
+    if output.suffix != ".png":
+        output = output / data.stem
+        output.mkdir(parents=True, exist_ok=True)
 
     data = fm.load_logs(data)
     graph_filters = {
