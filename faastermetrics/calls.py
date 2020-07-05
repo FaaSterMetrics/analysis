@@ -47,26 +47,17 @@ class Call:
 
 def artillery_to_call(entries: List[LogEntry]) -> Call:
     id, = uniq_by(entries, lambda e: e.id)
+    called_id, = uniq_by(entries, lambda e: e.called_id)
     start = cg.get_one(entries, lambda e: e.event["type"] == "before")
     end = cg.get_one(entries, lambda e: e.event["type"] == "after")
     duration = end.timestamp - start.timestamp
-    url, = uniq_by(entries, lambda e: e.url)
-
-    if "/dev/" in url:
-        function = url.split("/dev/")[-1]
-    else:
-        function = url.split("/", 3)[-1]
-
-    # FIXME: fix until we have a better idea how to properly fix artillery call
-    # function name
-    if "frontend" in function:
-        function = function.split("/")[0]
+    function, = uniq_by(entries, lambda e: e.url)
 
     calls = [
-        Call(id=id, function=function, entries=[], duration=duration)
+        Call(id=called_id, function=function, entries=[], duration=duration)
     ]
     return Call(
-        id=(id[0], UNDEFINED_XPAIR),
+        id=id,
         function="artillery",
         duration=duration,
         calls=calls,
@@ -79,12 +70,6 @@ def single_request_to_call(entries: List[LogEntry], id=None, function=None) -> C
         id, = uniq_by(entries, lambda e: e.id)
     if function is None:
         function, = uniq_by(entries, lambda e: e.fn["name"])
-
-    # set routed path if CRUD call
-    if all(PerfLog.is_routed_entry(e) for e in entries):
-        subname = entries[0].perf_type_data.split(":")[0]
-        if subname != "/":
-            function += subname
 
     measure = cg.get_one(entries, lambda e: e.perf["entryType"] == "measure")
     duration = datetime.timedelta(milliseconds=measure.perf["duration"])
@@ -132,24 +117,72 @@ def misc_to_call(entries: List[LogEntry]) -> Call:
     )
 
 
-def id_groups_to_call(entry_id, function, entries: List[LogEntry]) -> Call:
-    (context_id, _) = entry_id
-    if context_id is None:
+def id_groups_to_call(entry_id, entries: List[LogEntry]) -> Call:
+    if entry_id[0] is None:
         return misc_to_call(entries)
 
-    if function == "artillery":
+    if entry_id[1] == UNDEFINED_XPAIR:
         return artillery_to_call(entries)
 
-    try:
-        return request_to_call(entries)
-    except ValueError as err:
-        print(f"Ignoring {function}{entry_id} with {len(entries)} entries: {err}")
+    return request_to_call(entries)
+
+
+def url_to_function_name(name):
+    # AWS URL is DOMAIN/dev/PATH
+    if "/dev/" in name:
+        parts = name.split("/dev/", 1)[1].split("/")
+    else:
+        parts = name.split("/", 1)[1:]
+
+    parts = [p for p in parts if p]
+
+    new_name = "/".join(parts[:2])
+
+    return new_name
+
+
+def normalize_call_names(calls):
+    id_names = group_by(
+        [c for c in calls] + [s for c in calls for s in c.calls],
+        lambda c: c.id
+    )
+
+    # built id name translation mapping
+    id_translated = {}
+    for key, id_calls in id_names.items():
+        names = {c.function for c in id_calls}
+        if len(names) == 1:
+            name, = names
+            if "http" in name:
+                name = url_to_function_name(name)
+            id_translated[key] = name
+        elif len(names) > 1:
+            name, = [url_to_function_name(n) for n in names if "http" in n]
+            id_translated[key] = name
+
+    # rename calls
+    for call in calls:
+        call.function = id_translated[call.id]
+        for subcall in call.calls:
+            subcall.function = id_translated[subcall.id]
+
+    return calls
 
 
 def create_requestgroups(data: List[LogEntry]) -> List[Call]:
     """Create a list of logs based on request behavior."""
-    context_id_groups = group_by(data, lambda e: (e.id, e.function))
-    return [c for c in [
-        id_groups_to_call(id, function, entries)
-        for (id, function), entries in context_id_groups.items()
-    ] if c is not None]
+    context_id_groups = group_by(data, lambda e: e.id)
+    calls = [
+        id_groups_to_call(id, entries)
+        for id, entries in context_id_groups.items()
+    ]
+
+    # remove calls without a context ID, these are most probably platform
+    # messages
+    len_all_calls = len(calls)
+    calls = [c for c in calls if c.id[0] is not None]
+    print(f"Keep with context ids only: {len(calls)}/{len_all_calls}")
+
+    # normalize artillery call urls
+    calls = normalize_call_names(calls)
+    return calls

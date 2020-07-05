@@ -133,6 +133,14 @@ class ArtilleryLog(LogEntry):
     _special_keys: ClassVar = ("url", "type")
 
     @property
+    def called_id(self):
+        return super().id
+
+    @property
+    def id(self):
+        return (self.context_id, UNDEFINED_XPAIR)
+
+    @property
     def type(self):
         return self.event["type"]
 

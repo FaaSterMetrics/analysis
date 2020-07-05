@@ -8,15 +8,11 @@ import numpy as np
 import networkx as nx
 from .logentry import LogEntry
 from .calls import create_requestgroups
-from .helper import uniq_by
+from .helper import uniq_by, group_by
 
 
 def build_call_graph(entries: LogEntry) -> nx.DiGraph:
     calls = create_requestgroups(entries)
-
-    len_all_calls = len(calls)
-    calls = [c for c in calls if c.id[0] is not None]
-    print(f"Keep with context ids only: {len(calls)}/{len_all_calls}")
 
     count_ids = Counter([c.id for c in calls])
     if max(count_ids.values()) > 1:
@@ -42,24 +38,21 @@ def build_function_graph(entries: LogEntry) -> nx.DiGraph:
     """
     calls = create_requestgroups(entries)
 
-    # remove calls without a context ID, these are most probably platform
-    # messages
-    len_all_calls = len(calls)
-    calls = [c for c in calls if c.id[0] is not None]
-    print(f"Keep with context ids only: {len(calls)}/{len_all_calls}")
-
     graph = nx.DiGraph()
 
     for call in calls:
         # add edges
         for subcall in call.calls:
-            if not graph.has_edge(call.function, subcall.function):
-                graph.add_edge(call.function, subcall.function, calls=[subcall])
-            else:
-                graph.edges[(call.function, subcall.function)]["calls"].append(subcall)
+            subcall_function = subcall.function
+            # subcall_function = id_names.get(subcall.id, subcall.function)
 
-            if "calls" not in graph.nodes[subcall.function]:
-                graph.nodes[subcall.function]["calls"] = []
+            if not graph.has_edge(call.function, subcall_function):
+                graph.add_edge(call.function, subcall_function, calls=[subcall])
+            else:
+                graph.edges[(call.function, subcall_function)]["calls"].append(subcall)
+
+            if "calls" not in graph.nodes[subcall_function]:
+                graph.nodes[subcall_function]["calls"] = []
 
         if not graph.has_node(call.function):
             graph.add_node(call.function)
