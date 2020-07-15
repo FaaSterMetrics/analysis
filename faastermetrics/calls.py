@@ -5,7 +5,7 @@ from typing import List
 import datetime
 from dataclasses import dataclass, field
 
-from .logentry import LogEntry, RequestLog, PerfLog, UNDEFINED_XPAIR, MARK_END, MARK_START
+from .logentry import LogEntry, RequestLog, PerfLog, UNDEFINED_XPAIR, MARK_END, MARK_START, ArtilleryLog
 from . import helper as cg
 from .helper import group_by_function, group_by, uniq_by
 
@@ -121,7 +121,7 @@ def id_groups_to_call(entry_id, entries: List[LogEntry]) -> Call:
     if entry_id[0] is None:
         return misc_to_call(entries)
 
-    if entry_id[1] == UNDEFINED_XPAIR:
+    if all(isinstance(e, ArtilleryLog) for e in entries):
         return artillery_to_call(entries)
 
     return request_to_call(entries)
