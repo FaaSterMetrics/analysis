@@ -24,7 +24,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         "json_coder==0.5",
-        "argmagic==1.0.0",
+        "argmagic==1.0.1",
         "networkx",
     ],
     classifiers=[
