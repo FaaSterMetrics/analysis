@@ -363,6 +363,7 @@ def analyze_tree(data: List[fm.LogEntry], plotdir: pathlib.Path, style: str, fil
     functions = filters["functions_only"]
     if functions:
         print(f"Only show: {functions}")
+        print(functions)
         graph = graph.subgraph(functions)
 
     plot_graph(graph, plotdir, filters, style=style)
@@ -376,7 +377,7 @@ def main(
         context: str = None,
         degree: int = 0,
         xpair: bool = False,
-        functions: List[str] = lambda: list(),
+        functions: List[str] = list(),
         notime: bool = False):
     """
     Args:
