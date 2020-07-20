@@ -1,0 +1,24 @@
+#!/bin/bash
+
+if [ -z "${1:-}" ]; then
+	echo "$0 <command> ..."
+	echo "Available script commands:"
+	for f in $(find scripts -name '*.py'); do
+		echo "  $(basename $f .py)"
+	done
+	echo "Available plot commands:"
+	for f in $(find plots -name '*.py'); do
+		echo "  $(basename $f .py)"
+	done
+	exit
+fi
+
+script=$(find scripts plots -name "$1.py" | head -n 1)
+
+if [ -z "$script" ]; then
+	echo "Invalid command"
+	exit
+fi
+
+shift
+python3 "$script" $@

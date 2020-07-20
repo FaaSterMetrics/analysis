@@ -24,5 +24,6 @@ else
 fi
 
 python ./scripts/analysis_function_tree.py "$file_dump" > "$2/function_tree.txt"
+python ./scripts/export.py "$file_dump" "$2/dump.csv"
 python ./plots/execution_time.py "$file_dump" "$2"
 python ./plots/function_graph.py --style modern "$file_dump" "$2/function_graph.png"
