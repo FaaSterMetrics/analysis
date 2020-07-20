@@ -292,6 +292,11 @@ def apply_agraph_style(A, graph, filters, style):
 
     # create subgraphs
     for value, nodes in val_nodes.items():
+
+        # skip empty providers
+        if not nodes:
+            continue
+
         subgraph_name = f"cluster_{value}"
         platgroup = A.add_subgraph(nodes, name=subgraph_name, label=value, **cluster_style)
 
