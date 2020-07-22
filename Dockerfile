@@ -15,4 +15,4 @@ WORKDIR /analysis
 
 RUN python3 setup.py install
 
-CMD python3 ./run_analysis.sh
+CMD ["./run_analysis.sh"]
